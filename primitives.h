@@ -1,69 +1,51 @@
 #pragma once
 
-/////////////////////////////////////////////////////
-// INCLUDES
-/////////////////////////////////////////////////////
-
-#include "entity.h"
 #include "shader/shader_class.h"
-#define STB_IMAGE_IMPLEMENTATION
-#include "libs/image/stb_image.h"
 #include "glad/glad.h"
 
 #include <GLFW/glfw3.h>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <glm/ext/vector_float3.hpp>
 
 // stdlib
-#include <vector>
-#include <strstream>
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <cstring>
 #include <cmath>
-#include <random>
+#include <cstring>
+#include <iostream>
+#include <string>
+#include <vector>
 
 // assimp
 #include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
 #include <assimp/material.h>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
 
+class mesh {
 
-
-class Texture {
-
-  GLuint handle;
-  GLuint width;
-  GLuint height;
-
-  void load_texture() {
-
-    
-    
-  }
-
-};
-
-class Model {
-
-  std::vector<int> mesh_indices;
-
-  void load_model() {
-
-  }
-};
-
-class Mesh {
-
-  std::vector<int> mesh_vao_handle;
-  int index_count;
+ public:
+  std::vector<float> mesh_vertices;
+  std::vector<unsigned int> mesh_indices;
+  std::vector<float> mesh_tex_coordinates;
   
-  void load_model() {
+  GLuint mesh_VAO;
+  GLuint mesh_VBO;
+  GLuint mesh_tex_VBO;
+  GLuint mesh_EBO;
 
-  }
+};
+
+class model {
+ public:
+  std::vector<mesh> contained_meshes;
+  std::vector<std::string>texture_path;
   
 };
+
+class scene {
+ public:
+  std::vector<model> loaded_models;
+  
+};
+

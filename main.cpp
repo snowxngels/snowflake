@@ -6,6 +6,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "glad/glad.h"
 #include "libs/image/stb_image.h"
+#include "./primitives.h"
 
 #include <GLFW/glfw3.h>
 #include <glm/ext/vector_float3.hpp>
@@ -212,14 +213,22 @@ int main() {
 
   // model loading
 
+
   //////////////////////////////////////
+  
+  mesh first_entity;
+  model first_model;
+  scene first_scene;
+
+  first_model.contained_meshes.push_back(first_entity);
+  first_scene.loaded_models.push_back(first_model);
 
   float width = 2.0f;
   float height = 1.0f;
   float length = 3.0f;
 
   // Create a vector for the vertices
-  std::vector<float> entity_vertices = {
+  first_scene.loaded_models[0].contained_meshes[0].mesh_vertices = {
       // Positions (x, y, z)
       -width / 2, -height / 2, -length / 2, // Vertex 0
       width / 2,  -height / 2, -length / 2, // Vertex 1
@@ -231,7 +240,7 @@ int main() {
       -width / 2, height / 2,  length / 2   // Vertex 7
   };
 
-  std::vector<float> tex_indices = {
+  first_scene.loaded_models[0].contained_meshes[0].mesh_tex_coordinates = {
       // Texture coordinates for each vertex
       0.0f, 0.0f, // TexCoord for Vertex 0 (Bottom Left)
       1.0f, 0.0f, // TexCoord for Vertex 1 (Bottom Right)
@@ -245,7 +254,7 @@ int main() {
   };
 
   // Create a vector for the indices
-  std::vector<int> entity_indices = {// Front face
+  first_scene.loaded_models[0].contained_meshes[0].mesh_indices = {// Front face
                                      0, 1, 2, 2, 3, 0,
                                      // Back face
                                      4, 5, 6, 6, 7, 4,
@@ -260,44 +269,49 @@ int main() {
 
   /////////////////////////////////////
 
-  // buffers initialize
-
-  //  int num_tex = 0;
-  //  for(auto& i : active_scene.loaded_entities) {
+  scene active_scene = first_scene;
+  
+  ////////////////////////////////////
+  
 
   printf("initializing buffers\n");
 
-  // vao
-  GLuint entity_VAO;
-  glGenVertexArrays(1, &entity_VAO);
-  glBindVertexArray(entity_VAO);
+  for (auto i : active_scene.loaded_models) {
 
-  // vbo mesh
-  GLuint entity_VBO;
-  glGenBuffers(1, &entity_VBO);
-  glBindBuffer(GL_ARRAY_BUFFER, entity_VBO);
-  glBufferData(GL_ARRAY_BUFFER, entity_vertices.size() * sizeof(float),
-               entity_vertices.data(), GL_STATIC_DRAW);
-  // tell attrib pointers where to read
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
-  glEnableVertexAttribArray(0);
+    for (auto sub_mesh : i.contained_meshes) {
 
-  // vbo tex
-  GLuint tex_VBO;
-  glGenBuffers(1, &tex_VBO);
-  glBindBuffer(GL_ARRAY_BUFFER, tex_VBO);
-  glBufferData(GL_ARRAY_BUFFER, tex_indices.size() * sizeof(float),
-               tex_indices.data(), GL_STATIC_DRAW);
-  // texture read
-  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
-  glEnableVertexAttribArray(1);
+      // vao
+      glGenVertexArrays(1, &sub_mesh.mesh_VAO);
+      glBindVertexArray(sub_mesh.mesh_VAO);
 
-  // ebo
-  GLuint entity_EBO;
-  glGenBuffers(1, &entity_EBO);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, entity_EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, entity_indices.size() * sizeof(int),
-               entity_indices.data(), GL_STATIC_DRAW);
+      // vbo mesh (vertices)
+      glGenBuffers(1, &sub_mesh.mesh_VBO);
+      glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_VBO);
+      glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_vertices.size() * sizeof(float),
+                   sub_mesh.mesh_vertices.data(), GL_STATIC_DRAW);
+      // tell attrib pointers where to read
+      glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                            (void *)0);
+      glEnableVertexAttribArray(0);
+
+      // vbo tex
+      glGenBuffers(1, &sub_mesh.mesh_tex_VBO);
+      glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_tex_VBO);
+      glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_tex_coordinates.size() * sizeof(float),
+                   sub_mesh.mesh_tex_coordinates.data(), GL_STATIC_DRAW);
+      // texture read
+      glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
+                            (void *)0);
+      glEnableVertexAttribArray(1);
+
+      // ebo
+      glGenBuffers(1, &sub_mesh.mesh_EBO);
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sub_mesh.mesh_EBO);
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER, sub_mesh.mesh_indices.size() * sizeof(int),
+                   sub_mesh.mesh_indices.data(), GL_STATIC_DRAW);
+
+    }
+  }
 
   Shader mainShader("default.vert", "default.frag");
 
@@ -338,7 +352,7 @@ int main() {
     glm::mat4 view;
     view = glm::lookAt(cameraPos, cameraLookAt + cameraPos, cameraUp);
 
-    // render loop for all loaded models
+    // render loop for all loaded models ALSO CALL BIND TEXTURE FOR EVERY TEXTURE!!!!!!!
     glBindVertexArray(entity_VAO);
     if (glIsVertexArray(entity_VAO) == GL_FALSE) {
       std::cout << "ERROR::VAO::INVALID_ID: " << entity_VAO << std::endl;
