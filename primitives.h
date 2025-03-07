@@ -15,6 +15,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <string>
 
 // assimp
 #include <assimp/Importer.hpp>
@@ -28,10 +29,12 @@ class mesh {
   std::vector<float> mesh_vertices;
   std::vector<unsigned int> mesh_indices;
   std::vector<float> mesh_tex_coordinates;
+  std::string texture_path;
   
   GLuint mesh_VAO;
   GLuint mesh_VBO;
   GLuint mesh_tex_VBO;
+  GLuint mes_tex_id;
   GLuint mesh_EBO;
 
 };

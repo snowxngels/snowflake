@@ -140,7 +140,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
 // UTILITY FUNCTIONS
 ///////////////////////////////////////////////////////
 
-void bind_texture_to_slot(std::string to_load, unsigned int slot) {
+GLuint bind_texture_to_slot(std::string to_load, unsigned int slot) {
   printf("trying to load textures into slot :%d\n", slot);
   int width, height, nrChannels;
   unsigned char *data =
@@ -163,7 +163,7 @@ void bind_texture_to_slot(std::string to_load, unsigned int slot) {
   stbi_image_free(data);
   glBindTexture(GL_TEXTURE_2D, texture);
 
-  return;
+  return texture;
 }
 
 ///////////////////////////////////////////////////////
@@ -270,15 +270,17 @@ int main() {
   /////////////////////////////////////
 
   scene active_scene = first_scene;
+
+  
   
   ////////////////////////////////////
   
 
   printf("initializing buffers\n");
 
-  for (auto i : active_scene.loaded_models) {
+  for (auto &i : active_scene.loaded_models) {
 
-    for (auto sub_mesh : i.contained_meshes) {
+    for (auto &sub_mesh : i.contained_meshes) {
 
       // vao
       glGenVertexArrays(1, &sub_mesh.mesh_VAO);
@@ -319,7 +321,10 @@ int main() {
 
   printf("trying to import a texture...\n");
 
-  bind_texture_to_slot("./assets/grass.jpeg", 0);
+  ////// JANK FIX LATER!!!
+  
+  active_scene.loaded_models[0].contained_meshes[0].mes_tex_id = bind_texture_to_slot("./assets/grass.jpeg", 0);
+
   mainShader.setInt("texture1", 0);
 
   // random shit for render loop
@@ -337,7 +342,7 @@ int main() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
-    // setup ============================
+    // bungie 
     float currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
@@ -352,37 +357,50 @@ int main() {
     glm::mat4 view;
     view = glm::lookAt(cameraPos, cameraLookAt + cameraPos, cameraUp);
 
-    // render loop for all loaded models ALSO CALL BIND TEXTURE FOR EVERY TEXTURE!!!!!!!
-    glBindVertexArray(entity_VAO);
-    if (glIsVertexArray(entity_VAO) == GL_FALSE) {
-      std::cout << "ERROR::VAO::INVALID_ID: " << entity_VAO << std::endl;
+    for (auto &i : active_scene.loaded_models) {
+      
+      for (auto &j : i.contained_meshes) {
+
+        // render loop for all loaded models ALSO CALL BIND TEXTURE FOR EVERY
+        // TEXTURE!!!!!!!
+        glBindTexture(
+            GL_TEXTURE_2D,
+            active_scene.loaded_models[0].contained_meshes[0].mes_tex_id);
+        glBindVertexArray(j.mesh_VAO);
+        if (glIsVertexArray(j.mesh_VAO) == GL_FALSE) {
+          std::cout << "ERROR::VAO::INVALID_ID: " << j.mesh_VAO << std::endl;
+        }
+
+        mainShader.use();
+
+        // model matrix
+        glm::mat4 model = glm::mat4(1.0f);
+
+        model = glm::translate(model,
+                               glm::vec3(1.0f * sin(currentFrame), 0.0f, 0.0f));
+
+        // get ID of uniform for model pos data
+        int modelLoc = glGetUniformLocation(mainShader.ID, "model");
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+        // get ID of uniform for view matrix data
+        int viewLoc = glGetUniformLocation(mainShader.ID, "view");
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+
+        // get ID of uniform for proj matrix
+        int projectionLoc = glGetUniformLocation(mainShader.ID, "projection");
+        glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(proj));
+
+        if (modelLoc == -1 || viewLoc == -1 || projectionLoc == -1) {
+          std::cout << "ERROR::UNIFORM::LOCATION_NOT_FOUND" << std::endl;
+        }
+
+        // actually draw elements
+        glDrawElements(GL_TRIANGLES, j.mesh_indices.size(), GL_UNSIGNED_INT, 0);
+	
+      }
     }
-
-    mainShader.use();
-
-    // model matrix
-    glm::mat4 model = glm::mat4(1.0f);
-
-    model = glm::translate(model, glm::vec3(1.0f*sin(currentFrame), 0.0f, 0.0f)); 
     
-    // get ID of uniform for model pos data
-    int modelLoc = glGetUniformLocation(mainShader.ID, "model");
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-
-    // get ID of uniform for view matrix data
-    int viewLoc = glGetUniformLocation(mainShader.ID, "view");
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-
-    // get ID of uniform for proj matrix
-    int projectionLoc = glGetUniformLocation(mainShader.ID, "projection");
-    glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(proj));
-
-    if (modelLoc == -1 || viewLoc == -1 || projectionLoc == -1) {
-      std::cout << "ERROR::UNIFORM::LOCATION_NOT_FOUND" << std::endl;
-    }
-
-    // actually draw elements
-    glDrawElements(GL_TRIANGLES, entity_indices.size(), GL_UNSIGNED_INT, 0);
     // glDrawArrays(GL_TRIANGLES, 0, 36);
     glfwSwapBuffers(window);
     glfwPollEvents();
