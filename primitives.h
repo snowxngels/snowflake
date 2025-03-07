@@ -49,6 +49,14 @@ class model {
 class scene {
  public:
   std::vector<model> loaded_models;
+
+  void add_model_to_scene(model add_model) {
+
+    loaded_models.push_back(add_model);
+
+    return;
+
+  }
   
 };
 

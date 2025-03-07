@@ -2,6 +2,7 @@
 // INCLUDES
 /////////////////////////////////////////////////////
 
+#include "loaders.h"
 #include "shader/shader_class.h"
 #define STB_IMAGE_IMPLEMENTATION
 #include "glad/glad.h"
@@ -271,7 +272,11 @@ int main() {
 
   scene active_scene = first_scene;
 
+  model second_model;
+
+  second_model.contained_meshes.push_back(import_obj_mesh("assets/block/untitled.obj")); 
   
+  active_scene.add_model_to_scene(second_model);
   
   ////////////////////////////////////
   
@@ -324,6 +329,7 @@ int main() {
   ////// JANK FIX LATER!!!
   
   active_scene.loaded_models[0].contained_meshes[0].mes_tex_id = bind_texture_to_slot("./assets/grass.jpeg", 0);
+  active_scene.loaded_models[1].contained_meshes[0].mes_tex_id = bind_texture_to_slot("./assets/grass.jpeg", 1);
 
   mainShader.setInt("texture1", 0);
 
