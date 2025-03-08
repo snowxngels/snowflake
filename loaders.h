@@ -81,13 +81,13 @@ mesh import_obj_mesh(std::string file_path) {
 
         std::cout << "deserializing a tex cord" << std::endl;
 
-        float texx;
-        float texy;
+        float texu;
+        float texv;
 
-        s >> junk >> texx >> texy;
+        s >> junk >> texu >> texv;
 
-        buffer_tex_cords_x.push_back(texx);
-        buffer_tex_cords_y.push_back(texy);
+        buffer_tex_cords_x.push_back(texu);
+        buffer_tex_cords_y.push_back(texv);
       }
     }
 
@@ -138,7 +138,7 @@ mesh import_obj_mesh(std::string file_path) {
       vertices.push_back(buffer_vertex_z[verti3 - 1]);
 
       // writing indices of face we deserialized
-
+      
       tex_cords.push_back(buffer_tex_cords_x[texi1-1]);
       tex_cords.push_back(buffer_tex_cords_y[texi1-1]);
 
@@ -227,16 +227,16 @@ mesh import_obj_mesh_rev2(std::string file_path) {
             vertices.push_back(buffer_vertex_x[verti3]);
             vertices.push_back(buffer_vertex_y[verti3]);
             vertices.push_back(buffer_vertex_z[verti3]);
-
+	    
             // Add texture coordinates
             tex_coords.push_back(buffer_tex_cords_x[texi1]);
-            tex_coords.push_back(buffer_tex_cords_y[texi1]);
+            tex_coords.push_back(1-buffer_tex_cords_y[texi1]);
 
             tex_coords.push_back(buffer_tex_cords_x[texi2]);
-            tex_coords.push_back(buffer_tex_cords_y[texi2]);
+            tex_coords.push_back(1-buffer_tex_cords_y[texi2]);
 
             tex_coords.push_back(buffer_tex_cords_x[texi3]);
-            tex_coords.push_back(buffer_tex_cords_y[texi3]);
+            tex_coords.push_back(1-buffer_tex_cords_y[texi3]);
 
             // Add indices
             indices.push_back(indices.size());
