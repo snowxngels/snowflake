@@ -214,67 +214,11 @@ int main() {
 
   // model loading
 
-
-  //////////////////////////////////////
-  
-  mesh first_entity;
-  model first_model;
-  scene first_scene;
-
-  first_model.contained_meshes.push_back(first_entity);
-  first_scene.loaded_models.push_back(first_model);
-
-  float width = 2.0f;
-  float height = 1.0f;
-  float length = 3.0f;
-
-  // Create a vector for the vertices
-  first_scene.loaded_models[0].contained_meshes[0].mesh_vertices = {
-      // Positions (x, y, z)
-      -width / 2, -height / 2, -length / 2, // Vertex 0
-      width / 2,  -height / 2, -length / 2, // Vertex 1
-      width / 2,  height / 2,  -length / 2, // Vertex 2
-      -width / 2, height / 2,  -length / 2, // Vertex 3
-      -width / 2, -height / 2, length / 2,  // Vertex 4
-      width / 2,  -height / 2, length / 2,  // Vertex 5
-      width / 2,  height / 2,  length / 2,  // Vertex 6
-      -width / 2, height / 2,  length / 2   // Vertex 7
-  };
-
-  first_scene.loaded_models[0].contained_meshes[0].mesh_tex_coordinates = {
-      // Texture coordinates for each vertex
-      0.0f, 0.0f, // TexCoord for Vertex 0 (Bottom Left)
-      1.0f, 0.0f, // TexCoord for Vertex 1 (Bottom Right)
-      1.0f, 1.0f, // TexCoord for Vertex 2 (Top Right)
-      0.0f, 1.0f, // TexCoord for Vertex 3 (Top Left)
-      // Repeat for the other vertices if needed
-      0.0f, 0.0f, // TexCoord for Vertex 4 (Bottom Left)
-      1.0f, 0.0f, // TexCoord for Vertex 5 (Bottom Right)
-      1.0f, 1.0f, // TexCoord for Vertex 6 (Top Right)
-      0.0f, 1.0f  // TexCoord for Vertex 7 (Top Left)
-  };
-
-  // Create a vector for the indices
-  first_scene.loaded_models[0].contained_meshes[0].mesh_indices = {// Front face
-                                     0, 1, 2, 2, 3, 0,
-                                     // Back face
-                                     4, 5, 6, 6, 7, 4,
-                                     // Left face
-                                     0, 3, 7, 7, 4, 0,
-                                     // Right face
-                                     1, 2, 6, 6, 5, 1,
-                                     // Top face
-                                     3, 2, 6, 6, 7, 3,
-                                     // Bottom face
-                                     0, 1, 5, 5, 4, 0};
-
-  /////////////////////////////////////
-
-  scene active_scene = first_scene;
+  scene active_scene;
 
   model second_model;
 
-  second_model.contained_meshes.push_back(import_obj_mesh("assets/block/untitled.obj")); 
+  second_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/block/untitled.obj")); 
   
   active_scene.add_model_to_scene(second_model);
   
@@ -312,11 +256,13 @@ int main() {
       glEnableVertexAttribArray(1);
 
       // ebo
+      /*
       glGenBuffers(1, &sub_mesh.mesh_EBO);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sub_mesh.mesh_EBO);
       glBufferData(GL_ELEMENT_ARRAY_BUFFER, sub_mesh.mesh_indices.size() * sizeof(int),
                    sub_mesh.mesh_indices.data(), GL_STATIC_DRAW);
-
+      */
+      
     }
   }
 
@@ -328,8 +274,7 @@ int main() {
 
   ////// JANK FIX LATER!!!
   
-  active_scene.loaded_models[0].contained_meshes[0].mes_tex_id = bind_texture_to_slot("./assets/grass.jpeg", 0);
-  active_scene.loaded_models[1].contained_meshes[0].mes_tex_id = bind_texture_to_slot("./assets/grass.jpeg", 1);
+  active_scene.loaded_models[0].contained_meshes[0].mes_tex_id = bind_texture_to_slot("assets/block/block.jpg", 0);
 
   mainShader.setInt("texture1", 0);
 
@@ -402,7 +347,8 @@ int main() {
         }
 
         // actually draw elements
-        glDrawElements(GL_TRIANGLES, j.mesh_indices.size(), GL_UNSIGNED_INT, 0);
+	//        glDrawElements(GL_TRIANGLES, j.mesh_indices.size(), GL_UNSIGNED_INT, 0);
+	glDrawArrays(GL_TRIANGLES,0,j.mesh_vertices.size());
 	
       }
     }
