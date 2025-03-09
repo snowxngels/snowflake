@@ -35,6 +35,8 @@
 #define NEAR_CLIP_PLANE 0.1f
 #define FAR_CLIP_PLANE 100000.0f
 
+#define AMBIENT_LIGHTING_BASE 0.1f
+#define MAX_ALLOWED_LIGHTS 50
 // camera
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
 glm::vec3 cameraLookAt = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -227,6 +229,7 @@ int main() {
   model second_model;
   second_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/ball/ball.obj"));
   second_model.contained_meshes[0].location_y = 2.0f;
+  second_model.contained_meshes[0].render_type = 0.0f;
   active_scene.add_model_to_scene(second_model);
   
   model third_model;
@@ -237,18 +240,83 @@ int main() {
   model skybox_model;
   skybox_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/skybox/skybox.obj"));
   skybox_model.contained_meshes[0].mesh_type = MESH_SKYBOX;
+  skybox_model.contained_meshes[0].mesh_affected_by_light = 0;
   active_scene.add_model_to_scene(skybox_model);
-  
+
+  light first_light;
+  first_light.location_x = 5.0f;
+  first_light.location_y = 1.0f;
+  first_light.strength = 10;
+  active_scene.add_light_to_scene(first_light);
+
+
+  ///////////////////////////////////
+  // initialize lights in scene
+  ///////////////////////////////////
+
+  GLuint lightUBO;
+  glGenBuffers(1, &lightUBO);
+  glBindBuffer(GL_UNIFORM_BUFFER, lightUBO);
+  glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::vec3) * 10 + sizeof(float), NULL, GL_DYNAMIC_DRAW);
+  glBindBufferBase(GL_UNIFORM_BUFFER, 0, lightUBO);
+
+  glBufferSubData(GL_UNIFORM_BUFFER,
+		  0,
+		  sizeof(float)*active_scene.loaded_lights.size(),
+		  active_scene.loaded_lights.data());
+
+  //tmp light src def below
+
 
   ////////////////////////////////////
+  // initializing mesh buffers
+  ////////////////////////////////////
   
-
-  printf("initializing buffers\n");
-
+  printf("initializing buffers for meshes\n");
+  
   for (auto &i : active_scene.loaded_models) {
 
     for (auto &sub_mesh : i.contained_meshes) {
 
+
+      //calculate mesh vertex normals
+      std::vector<glm::vec3> vertexNormals; // buffer
+      size_t numVertices = sub_mesh.mesh_vertices.size() / 3;
+      vertexNormals.resize(numVertices, glm::vec3(0.0f));
+
+      for (size_t i = 0; i < sub_mesh.mesh_vertices.size(); i += 9) {
+
+        glm::vec3 v0(sub_mesh.mesh_vertices[i], sub_mesh.mesh_vertices[i + 1], sub_mesh.mesh_vertices[i + 2]); // Vertex 1
+        glm::vec3 v1(sub_mesh.mesh_vertices[i + 3], sub_mesh.mesh_vertices[i + 4],
+                     sub_mesh.mesh_vertices[i + 5]); // Vertex 2
+        glm::vec3 v2(sub_mesh.mesh_vertices[i + 6], sub_mesh.mesh_vertices[i + 7],
+                     sub_mesh.mesh_vertices[i + 8]); // Vertex 3
+
+        // Calculate the normal for the face
+        glm::vec3 faceNormal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
+
+        // Accumulate the face normal to each vertex's normal
+        vertexNormals[i / 3] += faceNormal;     // Vertex 1
+        vertexNormals[i / 3 + 1] += faceNormal; // Vertex 2
+        vertexNormals[i / 3 + 2] += faceNormal; // Vertex 3
+      }
+
+      for (size_t i = 0; i < vertexNormals.size(); ++i) {
+        vertexNormals[i] = glm::normalize(vertexNormals[i]);
+      }
+      
+      for (const auto &normal : vertexNormals) {
+        sub_mesh.mesh_normals.push_back(normal.x);
+        sub_mesh.mesh_normals.push_back(normal.y);
+        sub_mesh.mesh_normals.push_back(normal.z);
+      }
+
+      std::cout << "done calculating x normals x = " << sub_mesh.mesh_normals.size() << std::endl;
+      
+      //////////////////////////
+      // BUFFERS
+      //////////////////////////
+      
       // vao
       glGenVertexArrays(1, &sub_mesh.mesh_VAO);
       glBindVertexArray(sub_mesh.mesh_VAO);
@@ -258,7 +326,7 @@ int main() {
       glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_VBO);
       glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_vertices.size() * sizeof(float),
                    sub_mesh.mesh_vertices.data(), GL_STATIC_DRAW);
-      // tell attrib pointers where to read
+      // mesh stride
       glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             (void *)0);
       glEnableVertexAttribArray(0);
@@ -268,19 +336,29 @@ int main() {
       glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_tex_VBO);
       glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_tex_coordinates.size() * sizeof(float),
                    sub_mesh.mesh_tex_coordinates.data(), GL_STATIC_DRAW);
-      // texture read
+      // texture stride
       glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
                             (void *)0);
       glEnableVertexAttribArray(1);
 
-      // ebo
+      // vbo normals
+      glGenBuffers(1, &sub_mesh.mesh_norm_VBO);
+      glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_norm_VBO);
+      glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_normals.size() * sizeof(float),
+                   sub_mesh.mesh_normals.data(), GL_STATIC_DRAW);
+      // normals stride
+      glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                            (void *)0);
+      glEnableVertexAttribArray(2);
+
+      std::cout << sub_mesh.mesh_VBO << " vbo " << sub_mesh.mesh_tex_VBO << " tex_vbo " << sub_mesh.mesh_norm_VBO << " norm_vbo " << std::endl;
+      
       /*
       glGenBuffers(1, &sub_mesh.mesh_EBO);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sub_mesh.mesh_EBO);
       glBufferData(GL_ELEMENT_ARRAY_BUFFER, sub_mesh.mesh_indices.size() * sizeof(int),
                    sub_mesh.mesh_indices.data(), GL_STATIC_DRAW);
-      */
-      
+      */ 
     }
   }
 
@@ -291,7 +369,7 @@ int main() {
   printf("trying to import a texture...\n");
 
   ////// JANK FIX LATER!!!
-
+  
   unsigned int loaded_textures = 0;
 
   for(auto &i : active_scene.loaded_models) {
@@ -307,15 +385,16 @@ int main() {
     
   }
   
-  //mainShader.setInt("texture1", 0);
+  //////////////////////////////////////////
+  // setting up global values before rendering loop
+  //////////////////////////////////////////
 
-  // random shit for render loop
-  //  unsigned int transformLoc = glGetUniformLocation(mainShader.ID,
-  //  "transform");
-
-  // pre debugging space
-
-  //====================
+  int ambient_light_base_loc = glGetUniformLocation(mainShader.ID, "ambient_light_base");  
+  glUniform3f(ambient_light_base_loc,AMBIENT_LIGHTING_BASE,AMBIENT_LIGHTING_BASE,AMBIENT_LIGHTING_BASE);
+  
+  ////////////////////////
+  // rendering loop
+  ///////////////////////
 
   while (!glfwWindowShouldClose(window)) {
     processInput(window);
@@ -349,6 +428,23 @@ int main() {
     //skybox movement
     glm::mat4 skybox = glm::mat4(1.0f);
     skybox = glm::translate(skybox, cameraPos);
+
+    ////////////////////////////////////
+    // initialize all lights
+    ////////////////////////////////////
+
+    int num_lights_loc = glGetUniformLocation(mainShader.ID, "num_lights");
+    glUniform1i(num_lights_loc, MAX_ALLOWED_LIGHTS);
+
+    for (auto &i : active_scene.loaded_lights) {
+
+      
+
+    }    
+    
+    ////////////////////////////////////
+    // render all meshes
+    ////////////////////////////////////
     
     for (auto &i : active_scene.loaded_models) {
       
@@ -378,6 +474,28 @@ int main() {
         if (glIsVertexArray(j.mesh_VAO) == GL_FALSE) {
           std::cout << "ERROR::VAO::INVALID_ID: " << j.mesh_VAO << std::endl;
         }
+
+	//////////////////////////////
+	// calculate lightning
+	//////////////////////////////
+
+	float face_brightness;
+
+	face_brightness = 1;
+	
+	int face_brightness_loc = glGetUniformLocation(mainShader.ID, "face_brightness");
+	int aff_by_light_loc = glGetUniformLocation(mainShader.ID, "affected_by_light");
+
+	glUniform1i(aff_by_light_loc,j.mesh_affected_by_light);
+
+	//tmp below
+
+	int light_source_loc = glGetUniformLocation(mainShader.ID, "light_source");
+	glUniform3f(light_source_loc, sin(currentFrame)*5.0f, 2.0f, cos(currentFrame)*5.0f);
+	int light_color_loc = glGetUniformLocation(mainShader.ID, "light_color");
+	glUniform3f(light_color_loc, 50.0f, 50.0f, 40.0f);
+	int light_strength_loc = glGetUniformLocation(mainShader.ID, "light_strength");
+	glUniform1f(light_strength_loc, 0.3f);
 	
 	//////////////////////////////
 	// translation and rotation

@@ -41,7 +41,7 @@ enum e_light_type {
 };
 
 class light {
-
+  public:
   e_light_type light_type;
 
   unsigned int strength;
@@ -57,20 +57,22 @@ class mesh {
 
  public:
   std::vector<float> mesh_vertices;
-  std::vector<unsigned int> mesh_indices;
   std::vector<float> mesh_tex_coordinates;
+  std::vector<float> mesh_normals;
   std::string texture_path;
-
   e_mesh_types mesh_type;
 
   float render_type = 0.0f;
   float face_color_r = 20.0f;
   float face_color_g = 50.0f;
   float face_color_b = 80.0f;
+
+  int mesh_affected_by_light = 1;
   
   GLuint mesh_VAO;
   GLuint mesh_VBO;
   GLuint mesh_tex_VBO;
+  GLuint mesh_norm_VBO;
   GLuint mes_tex_id;
   GLuint mesh_EBO;
 
@@ -98,6 +100,14 @@ class scene {
   void add_model_to_scene(model add_model) {
 
     loaded_models.push_back(add_model);
+
+    return;
+
+  }
+  
+  void add_light_to_scene(light add_light) {
+
+    loaded_lights.push_back(add_light);
 
     return;
 
