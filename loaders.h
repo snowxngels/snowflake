@@ -190,6 +190,15 @@ mesh import_obj_mesh_rev2(std::string file_path) {
         std::istringstream s(line);
         std::string junk;
 
+	if(line[0] == 't') {
+
+	  std::string file_path;
+	  s >> junk >> file_path;
+
+	  output.texture_path = file_path;
+
+	}
+	
         if (line[0] == 'v') {
             if (line[1] == ' ') {
                 float vecx, vecy, vecz;

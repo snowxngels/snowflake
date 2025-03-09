@@ -1,1 +1,4 @@
-rewritten
+# snowflake
+
+a 3d game engine in c++ using no external libraries apart from opengl / stb
+

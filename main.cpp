@@ -216,11 +216,17 @@ int main() {
 
   scene active_scene;
 
-  model second_model;
-
-  second_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/torus/torus.obj")); 
+  model first_model;
+  first_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/torus/torus.obj")); 
+  active_scene.add_model_to_scene(first_model);
   
+  model second_model;
+  second_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/ball/ball.obj")); 
   active_scene.add_model_to_scene(second_model);
+  
+  model third_model;
+  third_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/weird/weird.obj")); 
+  active_scene.add_model_to_scene(third_model);
   
   ////////////////////////////////////
   
@@ -273,10 +279,23 @@ int main() {
   printf("trying to import a texture...\n");
 
   ////// JANK FIX LATER!!!
-  
-  active_scene.loaded_models[0].contained_meshes[0].mes_tex_id = bind_texture_to_slot("assets/torus/torus_texture.jpg", 0);
 
-  mainShader.setInt("texture1", 0);
+  unsigned int loaded_textures = 0;
+
+  for(auto &i : active_scene.loaded_models) {
+    for(auto &j : i.contained_meshes) {
+
+      j.mes_tex_id = bind_texture_to_slot( j.texture_path, loaded_textures);
+
+      std::cout << "loaded tex: " << j.texture_path << "in slot :" << loaded_textures << "with texture_id" << j.mes_tex_id << std::endl;
+      
+      loaded_textures++;
+
+    }
+    
+  }
+  
+  //mainShader.setInt("texture1", 0);
 
   // random shit for render loop
   //  unsigned int transformLoc = glGetUniformLocation(mainShader.ID,
@@ -314,15 +333,17 @@ int main() {
 
         // render loop for all loaded models ALSO CALL BIND TEXTURE FOR EVERY
         // TEXTURE!!!!!!!
+	// Uniform array with actual textures + uniform to set length of the array. use normal uniform to resolve length at start
         glBindTexture(
             GL_TEXTURE_2D,
-            active_scene.loaded_models[0].contained_meshes[0].mes_tex_id);
+            j.mes_tex_id);
+	mainShader.setInt("texture1",loaded_textures-1);
         glBindVertexArray(j.mesh_VAO);
         if (glIsVertexArray(j.mesh_VAO) == GL_FALSE) {
           std::cout << "ERROR::VAO::INVALID_ID: " << j.mesh_VAO << std::endl;
         }
 
-        mainShader.use();
+       
 
         // model matrix
         glm::mat4 model = glm::mat4(1.0f);
@@ -332,20 +353,25 @@ int main() {
 
         // get ID of uniform for model pos data
         int modelLoc = glGetUniformLocation(mainShader.ID, "model");
+	std::cout << modelLoc << "model" << std::endl;
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
         // get ID of uniform for view matrix data
         int viewLoc = glGetUniformLocation(mainShader.ID, "view");
+	std::cout << viewLoc << "view" << std::endl;
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
         // get ID of uniform for proj matrix
         int projectionLoc = glGetUniformLocation(mainShader.ID, "projection");
+	std::cout << projectionLoc << "prjoj" << std::endl;
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(proj));
 
         if (modelLoc == -1 || viewLoc == -1 || projectionLoc == -1) {
-          std::cout << "ERROR::UNIFORM::LOCATION_NOT_FOUND" << std::endl;
+          std::cout << "ERROR::UNIFORM::LOCATION_NOT_FOUND - Loc" << std::endl;
         }
 
+	 mainShader.use();
+	 
         // actually draw elements
 	//        glDrawElements(GL_TRIANGLES, j.mesh_indices.size(), GL_UNSIGNED_INT, 0);
 	glDrawArrays(GL_TRIANGLES,0,j.mesh_vertices.size());
