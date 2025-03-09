@@ -221,6 +221,7 @@ int main() {
   model first_model;
   first_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/torus/torus.obj"));
   first_model.contained_meshes[0].theta_y = 0.0f;
+  first_model.contained_meshes[0].render_type = 1.0f;
   active_scene.add_model_to_scene(first_model);
   
   model second_model;
@@ -334,7 +335,6 @@ int main() {
     
     float modifier_rotate = glm::radians(sin(currentFrame*4)*360);
     active_scene.loaded_models[0].contained_meshes[0].theta_y = modifier_rotate;
-    std::cout << modifier_rotate << " theta " << deltaTime << " delta" << std::endl;
     
     // projection matrix
     int height = 0, width = 0;
@@ -354,16 +354,35 @@ int main() {
       
       for (auto &j : i.contained_meshes) {
 
+	mainShader.use();
+		
+	//////////////////////////////////////
+	// change texture rendering or face rendering
+	//////////////////////////////////////
+
+	int render_type_loc = glGetUniformLocation(mainShader.ID, "render_type");
+	int face_color_loc = glGetUniformLocation(mainShader.ID, "face_color");
+
+	//copy render type (face shade / texture) and the face color to shader
+        glUniform1f(render_type_loc, j.render_type);
+	glUniform4f(face_color_loc,
+		    j.face_color_r/255.0f,
+		    j.face_color_g/255.0f,
+		    j.face_color_b/255.0f,
+		    1.0f);
+	
         // TEXTURE (i coded this on accident no clue why it works)
-        glBindTexture(
-            GL_TEXTURE_2D,
-            j.mes_tex_id);
-	mainShader.setInt("texture1",loaded_textures-1);
+        glBindTexture(GL_TEXTURE_2D, j.mes_tex_id);
+        mainShader.setInt("texture1", loaded_textures - 1);
         glBindVertexArray(j.mesh_VAO);
         if (glIsVertexArray(j.mesh_VAO) == GL_FALSE) {
           std::cout << "ERROR::VAO::INVALID_ID: " << j.mesh_VAO << std::endl;
         }
-
+	
+	//////////////////////////////
+	// translation and rotation
+	//////////////////////////////
+	
         // model matrix
         glm::mat4 model = glm::mat4(1.0f);
 
@@ -383,9 +402,13 @@ int main() {
 
 	model = model * mat_rot;
 	
-        // get ID of uniform for model pos data
+        // upload model matrix to shader
 	int modelLoc = glGetUniformLocation(mainShader.ID, "model");
-	if(j.mesh_type == MESH_SKYBOX) {
+        int viewLoc = glGetUniformLocation(mainShader.ID, "view");
+        int projectionLoc = glGetUniformLocation(mainShader.ID, "projection");
+
+	// mesh type transforms
+        if(j.mesh_type == MESH_SKYBOX) {
 	  
 	  glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(skybox));
 	  
@@ -395,19 +418,14 @@ int main() {
 	  
 	}
 	
-        // get ID of uniform for view matrix data
-        int viewLoc = glGetUniformLocation(mainShader.ID, "view");
+        // upload view matrix and projection matrix to shader
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-
-        // get ID of uniform for proj matrix
-        int projectionLoc = glGetUniformLocation(mainShader.ID, "projection");
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(proj));
 
+	//	std::cout << modelLoc << " model " << viewLoc << " view " << projectionLoc << " projection " << std::endl;	
         if (modelLoc == -1 || viewLoc == -1 || projectionLoc == -1) {
           std::cout << "ERROR::UNIFORM::LOCATION_NOT_FOUND - Loc" << std::endl;
         }
-
-	 mainShader.use();
 	 
 	// glDrawElements(GL_TRIANGLES, j.mesh_indices.size(), GL_UNSIGNED_INT, 0);
 	glDrawArrays(GL_TRIANGLES,0,j.mesh_vertices.size());

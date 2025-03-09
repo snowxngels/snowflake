@@ -32,6 +32,27 @@ enum e_mesh_types {
   
 };
 
+enum e_light_type {
+
+  LIGHT_DIFFUSE,
+  LIGHT_SPECULAR,
+  LIGHT_AMBIENT
+  
+};
+
+class light {
+
+  e_light_type light_type;
+
+  unsigned int strength;
+  
+  float location_x = 0.0f;
+  float location_y = 0.0f;
+  float location_z = 0.0f;
+
+  
+};
+
 class mesh {
 
  public:
@@ -41,6 +62,11 @@ class mesh {
   std::string texture_path;
 
   e_mesh_types mesh_type;
+
+  float render_type = 0.0f;
+  float face_color_r = 20.0f;
+  float face_color_g = 50.0f;
+  float face_color_b = 80.0f;
   
   GLuint mesh_VAO;
   GLuint mesh_VBO;
@@ -67,6 +93,7 @@ class model {
 class scene {
  public:
   std::vector<model> loaded_models;
+  std::vector<light> loaded_lights;
 
   void add_model_to_scene(model add_model) {
 
