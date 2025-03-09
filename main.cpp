@@ -219,7 +219,8 @@ int main() {
   scene active_scene;
 
   model first_model;
-  first_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/torus/torus.obj")); 
+  first_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/torus/torus.obj"));
+  first_model.contained_meshes[0].theta_y = 0.0f;
   active_scene.add_model_to_scene(first_model);
   
   model second_model;
@@ -228,8 +229,8 @@ int main() {
   active_scene.add_model_to_scene(second_model);
   
   model third_model;
-  third_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/weird/weird.obj"));
-  third_model.contained_meshes[0].location_x = 5.0f;
+  third_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/floor/floor.obj"));
+  third_model.contained_meshes[0].location_y = -1.0f;
   active_scene.add_model_to_scene(third_model);
 
   model skybox_model;
@@ -322,11 +323,19 @@ int main() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 
-    // bungie 
+    // bungie (deltatime)
     float currentFrame = glfwGetTime();
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
 
+    ///////////////////////////////////
+    // DEMO MOVEMENT CODE
+    ///////////////////////////////////
+    
+    float modifier_rotate = glm::radians(sin(currentFrame*4)*360);
+    active_scene.loaded_models[0].contained_meshes[0].theta_y = modifier_rotate;
+    std::cout << modifier_rotate << " theta " << deltaTime << " delta" << std::endl;
+    
     // projection matrix
     int height = 0, width = 0;
     glfwGetWindowSize(window, &height, &width);
@@ -361,6 +370,18 @@ int main() {
 	// setting mesh position transform
 	glm::vec3 mod_transform(j.location_x,j.location_y,j.location_z);	
 	model = glm::translate(model, mod_transform);
+
+	// setting mesh rotation transform
+	float rad_theta_x = glm::radians(j.theta_x);
+	float rad_theta_y = glm::radians(j.theta_y);
+	float rad_theta_z = glm::radians(j.theta_z);
+
+	glm::mat4 mat_rot_x = glm::rotate(glm::mat4(1.0f), rad_theta_x, glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::mat4 mat_rot_y = glm::rotate(glm::mat4(1.0f), rad_theta_y, glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::mat4 mat_rot_z = glm::rotate(glm::mat4(1.0f), rad_theta_z, glm::vec3(0.0f, 0.0f, 1.0f));
+	glm::mat4 mat_rot = mat_rot_x * mat_rot_y * mat_rot_z;
+
+	model = model * mat_rot;
 	
         // get ID of uniform for model pos data
 	int modelLoc = glGetUniformLocation(mainShader.ID, "model");
