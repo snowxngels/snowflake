@@ -23,6 +23,15 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
+enum e_mesh_types {
+
+  MESH_SKYBOX,
+  MESH_ENTITY,
+  MESH_LIGHT,
+  MESH_TRIANGLE
+  
+};
+
 class mesh {
 
  public:
@@ -30,6 +39,8 @@ class mesh {
   std::vector<unsigned int> mesh_indices;
   std::vector<float> mesh_tex_coordinates;
   std::string texture_path;
+
+  e_mesh_types mesh_type;
   
   GLuint mesh_VAO;
   GLuint mesh_VBO;
@@ -37,12 +48,19 @@ class mesh {
   GLuint mes_tex_id;
   GLuint mesh_EBO;
 
+  float location_x = 0.0f;
+  float location_y = 0.0f;
+  float location_z = 0.0f;
+
+  float theta_x = 0.0f;
+  float theta_y = 0.0f;
+  float theta_z = 0.0f;
+
 };
 
 class model {
  public:
   std::vector<mesh> contained_meshes;
-  std::vector<std::string>texture_path;
   
 };
 

@@ -32,6 +32,8 @@
 #define FOV_DEF 90.0f
 #define POLY_WIREFRAME false
 #define MESH_TO_LOAD "assets/Car.fbx"
+#define NEAR_CLIP_PLANE 0.1f
+#define FAR_CLIP_PLANE 100000.0f
 
 // camera
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
@@ -56,36 +58,6 @@ double pitch = 0;
 //////////////////////////////////////////////
 // INPUT HANDLERS + CALLBACK FUNCTIONS
 //////////////////////////////////////////////
-
-void processInput(GLFWwindow *window) {
-  if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-    glfwSetWindowShouldClose(window, true);
-
-  float cameraSpeed = 10.0f * deltaTime;
-  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-    cameraPos += cameraSpeed * cameraLookAt;
-  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-    cameraPos -= cameraSpeed * cameraLookAt;
-  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-    cameraPos -=
-        glm::normalize(glm::cross(cameraLookAt, cameraUp)) * cameraSpeed;
-  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-    cameraPos +=
-        glm::normalize(glm::cross(cameraLookAt, cameraUp)) * cameraSpeed;
-
-  if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) {
-    isMouseGrabbed = !isMouseGrabbed; // Toggle the state
-    if (isMouseGrabbed) {
-      isMouseOnCooldown = true;
-      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // Grab the mouse
-    } else {
-      isMouseOnCooldown = true;
-      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); // Release the mouse
-    }
-  }
-  
-}
-
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
   glViewport(0, 0, width, height);
 }
@@ -136,6 +108,36 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
   direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
   cameraLookAt = glm::normalize(direction);
 }
+
+void processInput(GLFWwindow *window) {
+  if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+    glfwSetWindowShouldClose(window, true);
+
+  float cameraSpeed = 10.0f * deltaTime;
+  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    cameraPos += cameraSpeed * cameraLookAt;
+  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    cameraPos -= cameraSpeed * cameraLookAt;
+  if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    cameraPos -=
+        glm::normalize(glm::cross(cameraLookAt, cameraUp)) * cameraSpeed;
+  if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    cameraPos +=
+        glm::normalize(glm::cross(cameraLookAt, cameraUp)) * cameraSpeed;
+
+  if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) {
+    isMouseGrabbed = !isMouseGrabbed; // Toggle the state
+    if (isMouseGrabbed) {
+      isMouseOnCooldown = true;
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // Grab the mouse
+    } else {
+      isMouseOnCooldown = true;
+      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); // Release the mouse
+    }
+  }
+  
+}
+
 
 ///////////////////////////////////////////////////////
 // UTILITY FUNCTIONS
@@ -221,13 +223,21 @@ int main() {
   active_scene.add_model_to_scene(first_model);
   
   model second_model;
-  second_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/ball/ball.obj")); 
+  second_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/ball/ball.obj"));
+  second_model.contained_meshes[0].location_y = 2.0f;
   active_scene.add_model_to_scene(second_model);
   
   model third_model;
-  third_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/weird/weird.obj")); 
+  third_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/weird/weird.obj"));
+  third_model.contained_meshes[0].location_x = 5.0f;
   active_scene.add_model_to_scene(third_model);
+
+  model skybox_model;
+  skybox_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/skybox/skybox.obj"));
+  skybox_model.contained_meshes[0].mesh_type = MESH_SKYBOX;
+  active_scene.add_model_to_scene(skybox_model);
   
+
   ////////////////////////////////////
   
 
@@ -321,19 +331,21 @@ int main() {
     int height = 0, width = 0;
     glfwGetWindowSize(window, &height, &width);
     glm::mat4 proj = glm::perspective(
-        glm::radians(FOV_DEF), (float)width / (float)height, 0.1f, 100.0f);
+        glm::radians(FOV_DEF), (float)width / (float)height, NEAR_CLIP_PLANE, FAR_CLIP_PLANE);
 
     // view matrix
     glm::mat4 view;
     view = glm::lookAt(cameraPos, cameraLookAt + cameraPos, cameraUp);
 
+    //skybox movement
+    glm::mat4 skybox = glm::mat4(1.0f);
+    skybox = glm::translate(skybox, cameraPos);
+    
     for (auto &i : active_scene.loaded_models) {
       
       for (auto &j : i.contained_meshes) {
 
-        // render loop for all loaded models ALSO CALL BIND TEXTURE FOR EVERY
-        // TEXTURE!!!!!!!
-	// Uniform array with actual textures + uniform to set length of the array. use normal uniform to resolve length at start
+        // TEXTURE (i coded this on accident no clue why it works)
         glBindTexture(
             GL_TEXTURE_2D,
             j.mes_tex_id);
@@ -343,27 +355,31 @@ int main() {
           std::cout << "ERROR::VAO::INVALID_ID: " << j.mesh_VAO << std::endl;
         }
 
-       
-
         // model matrix
         glm::mat4 model = glm::mat4(1.0f);
 
-        model = glm::translate(model,
-                               glm::vec3(1.0f * sin(currentFrame), 0.0f, 0.0f));
-
+	// setting mesh position transform
+	glm::vec3 mod_transform(j.location_x,j.location_y,j.location_z);	
+	model = glm::translate(model, mod_transform);
+	
         // get ID of uniform for model pos data
-        int modelLoc = glGetUniformLocation(mainShader.ID, "model");
-	std::cout << modelLoc << "model" << std::endl;
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-
+	int modelLoc = glGetUniformLocation(mainShader.ID, "model");
+	if(j.mesh_type == MESH_SKYBOX) {
+	  
+	  glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(skybox));
+	  
+	} else {
+	  
+	  glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));        
+	  
+	}
+	
         // get ID of uniform for view matrix data
         int viewLoc = glGetUniformLocation(mainShader.ID, "view");
-	std::cout << viewLoc << "view" << std::endl;
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
         // get ID of uniform for proj matrix
         int projectionLoc = glGetUniformLocation(mainShader.ID, "projection");
-	std::cout << projectionLoc << "prjoj" << std::endl;
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(proj));
 
         if (modelLoc == -1 || viewLoc == -1 || projectionLoc == -1) {
@@ -372,8 +388,7 @@ int main() {
 
 	 mainShader.use();
 	 
-        // actually draw elements
-	//        glDrawElements(GL_TRIANGLES, j.mesh_indices.size(), GL_UNSIGNED_INT, 0);
+	// glDrawElements(GL_TRIANGLES, j.mesh_indices.size(), GL_UNSIGNED_INT, 0);
 	glDrawArrays(GL_TRIANGLES,0,j.mesh_vertices.size());
 	
       }
