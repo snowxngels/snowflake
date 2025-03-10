@@ -101,15 +101,16 @@ mesh import_obj_mesh_rev2(std::string file_path) {
             vertices.push_back(buffer_vertex_z[verti3]);
 	    
             // Add texture coordinates
-            tex_coords.push_back(buffer_tex_cords_x[texi1]);
-            tex_coords.push_back(1-buffer_tex_cords_y[texi1]);
-
-            tex_coords.push_back(buffer_tex_cords_x[texi2]);
-            tex_coords.push_back(1-buffer_tex_cords_y[texi2]);
-
-            tex_coords.push_back(buffer_tex_cords_x[texi3]);
-            tex_coords.push_back(1-buffer_tex_cords_y[texi3]);
-
+	    if(buffer_tex_cords_x.size() != 0 && buffer_tex_cords_y.size() != 0){
+	      tex_coords.push_back(buffer_tex_cords_x[texi1]);
+	      tex_coords.push_back(1-buffer_tex_cords_y[texi1]);
+	      
+	      tex_coords.push_back(buffer_tex_cords_x[texi2]);
+	      tex_coords.push_back(1-buffer_tex_cords_y[texi2]);
+	      
+	      tex_coords.push_back(buffer_tex_cords_x[texi3]);
+	      tex_coords.push_back(1-buffer_tex_cords_y[texi3]);
+	    }
             // Add indices
 	    //            indices.push_back(indices.size());
             //indices.push_back(indices.size());

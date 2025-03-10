@@ -10,7 +10,9 @@
 #include "./primitives.h"
 
 #include <GLFW/glfw3.h>
+#include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/vector_float3.hpp>
+#include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -38,6 +40,7 @@
 
 #define AMBIENT_LIGHTING_BASE 0.4f
 #define MAX_ALLOWED_LIGHTS 50
+
 // camera
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
 glm::vec3 cameraLookAt = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -48,6 +51,8 @@ glm::vec3 direction = {0.0f, 0.0f, 0.0f};
 // bungie employees hate this one simple trick
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
+float dampening_coefficient = 0.01f;
 
 // input shit
 bool isMouseGrabbed = true;
@@ -60,7 +65,9 @@ double pitch = 0;
 
 // debug stuff
 uint64_t total_vertices = 0;
- 
+unsigned int window_width = 1900;
+unsigned int window_heigh = 1020;
+
 //////////////////////////////////////////////
 // INPUT HANDLERS + CALLBACK FUNCTIONS
 //////////////////////////////////////////////
@@ -120,8 +127,8 @@ void processInput(GLFWwindow *window) {
     glfwSetWindowShouldClose(window, true);
 
   float cameraSpeed = 10.0f * deltaTime;
-  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-    cameraPos += cameraSpeed * cameraLookAt;
+  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {cameraPos += cameraSpeed * cameraLookAt; std::cout << "W pressed" << std::endl;}
+    
   if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
     cameraPos -= cameraSpeed * cameraLookAt;
   if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
@@ -141,6 +148,19 @@ void processInput(GLFWwindow *window) {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); // Release the mouse
     }
   }
+  /*
+  if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
+
+    for(auto i : active_scene.loaded_models){
+
+      if(i.physics_type==RIGID_BODY)
+	i.accell_x = 1.0f;
+      
+    }
+  }*/
+
+  return;
+  
 }
 
 ///////////////////////////////////////////////////////
@@ -154,7 +174,7 @@ int main() {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-  GLFWwindow *window = glfwCreateWindow(800, 600, "wdwion", NULL, NULL);
+  GLFWwindow *window = glfwCreateWindow(window_width, window_heigh, "snowflake - debug build", NULL, NULL);
   if (window == NULL) {
     std::cout << "Failed to create GLFW window" << std::endl;
     glfwTerminate();
@@ -167,7 +187,7 @@ int main() {
     return -1;
   }
 
-  glViewport(0, 0, 800, 600);
+  glViewport(0, 0, window_width, window_heigh);
 
   // setup
   glEnable(GL_DEPTH_TEST);
@@ -191,23 +211,32 @@ int main() {
   // model loading
 
   scene active_scene;
-
+  
   model first_model;
   first_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/torus/torus.obj"));
-  first_model.contained_meshes[0].theta_y = 0.0f;
-  first_model.contained_meshes[0].render_type = 1.0f;
+  first_model.theta_y = 0.0f;
+  first_model.contained_meshes[0].disable_tex_shading = 1.0f;
   active_scene.add_model_to_scene(first_model);
   
   model second_model;
   second_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/ball/ball.obj"));
-  second_model.contained_meshes[0].location_y = 2.0f;
+  second_model.location_y = 2.0f;
+  second_model.physics_type = RIGID_BODY;
   active_scene.add_model_to_scene(second_model);
   
   model third_model;
   third_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/floor/floor.obj"));
-  third_model.contained_meshes[0].location_y = -1.0f;
+  third_model.location_y = -1.0f;
   active_scene.add_model_to_scene(third_model);
-
+  /*
+  model fourth_model;
+  fourth_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/arrow/arrow.obj"));
+  //  fourth_model.contained_meshes[0].disable_tex_shading = 0.0f;
+  fourth_model.location_x = 5.0f;
+  fourth_model.contained_meshes[0].mesh_type = MESH_SPRITE;
+  active_scene.add_model_to_scene(fourth_model);
+  */
+  
   model skybox_model;
   skybox_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/skybox/skybox.obj"));
   skybox_model.contained_meshes[0].mesh_type = MESH_SKYBOX;
@@ -236,8 +265,20 @@ int main() {
 		  sizeof(float)*active_scene.loaded_lights.size(),
 		  active_scene.loaded_lights.data());
 
-  //tmp light src def below
+  ///////////////////////////////////
+  // generating visualizer meshes for light sources
+  ///////////////////////////////////
 
+  for(auto &i : active_scene.loaded_lights) {
+
+    model light_source_visualizer;
+    light_source_visualizer.contained_meshes.push_back(import_obj_mesh_rev2("assets/light_source/light_source.obj"));
+    light_source_visualizer.contained_meshes[0].mesh_type = MESH_LIGHT;
+    light_source_visualizer.contained_meshes[0].mesh_affected_by_light = 0.0f;
+    active_scene.loaded_models.push_back(light_source_visualizer);
+
+  }
+  
 
   ////////////////////////////////////
   // initializing mesh buffers
@@ -293,34 +334,40 @@ int main() {
       glEnableVertexAttribArray(2);
 
       //      std::cout << sub_mesh.mesh_VBO << " , " << sub_mesh.mesh_tex_VBO << " , " << sub_mesh.mesh_norm_VBO << " - mesh_vbo , tex_vbo and norm_vbo " << std::endl;
-      
-      /*
-      glGenBuffers(1, &sub_mesh.mesh_EBO);
-      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sub_mesh.mesh_EBO);
-      glBufferData(GL_ELEMENT_ARRAY_BUFFER, sub_mesh.mesh_indices.size() * sizeof(int),
-                   sub_mesh.mesh_indices.data(), GL_STATIC_DRAW);
-      */ 
+
     }
   }
 
   printf("finished importing %d meshes with %d vertices \n", active_scene.loaded_models.size(), total_vertices);
 
   Shader mainShader("default.vert", "default.frag");
-
   mainShader.use();
 
   printf("trying to import a texture...\n");
 
-  ////// JANK FIX LATER!!!
+  ////////////////////////////////
+  // LOADING TEXTURES
+  ///////////////////////////////
   
   unsigned int loaded_textures = 0;
 
   for(auto &i : active_scene.loaded_models) {
     for(auto &j : i.contained_meshes) {
 
-      j.mes_tex_id = bind_texture_to_slot( j.texture_path, loaded_textures);
+      if(j.texture_path != ""){
+	j.mes_tex_id = bind_texture_to_slot( j.texture_path, loaded_textures);
+	std::cout << "loaded texture: " << j.texture_path << "into slot :" << loaded_textures << " with texture_id: " << j.mes_tex_id << std::endl;
+      } else {
+	std::cout << "no texture path in mesh! using fallback texture! + face shading" << std::endl;
 
-      std::cout << "loaded texture: " << j.texture_path << "into slot :" << loaded_textures << " with texture_id: " << j.mes_tex_id << std::endl;
+        //	j.mesh_affected_by_light = 0.0f;
+	j.disable_tex_shading = 0.0f;
+
+        construct_fallback_uv_coordinates(&j);
+
+        j.mes_tex_id = bind_texture_to_slot( "assets/fallback/fallback.jpg", loaded_textures);
+	std::cout << "loaded fallback tex into slot :" << loaded_textures << " with texture_id: " << j.mes_tex_id << std::endl;
+      }
       
       loaded_textures++;
 
@@ -355,28 +402,57 @@ int main() {
     // DEMO MOVEMENT CODE
     ///////////////////////////////////
     
-    float modifier_rotate = glm::radians(sin(currentFrame*4)*360);
-    active_scene.loaded_models[0].contained_meshes[0].theta_y = modifier_rotate;
+    glm::vec3 light_pos(sin(currentFrame)*10.0f, 2.0f, cos(currentFrame)*10.0f);
     
     // projection matrix
     int height = 0, width = 0;
     glfwGetWindowSize(window, &height, &width);
     glm::mat4 proj = glm::perspective(
-        glm::radians(FOV_DEF), (float)width / (float)height, NEAR_CLIP_PLANE, FAR_CLIP_PLANE);
+        glm::radians(FOV_DEF), (float)window_width / (float)window_heigh, NEAR_CLIP_PLANE, FAR_CLIP_PLANE);
 
     // view matrix
     glm::mat4 view;
+    std::cout << cameraPos.x << " x " << cameraPos.y << " y " <<cameraPos.z << " z " << std::endl;
     view = glm::lookAt(cameraPos, cameraLookAt + cameraPos, cameraUp);
 
-    //skybox movement
-    glm::mat4 skybox = glm::mat4(1.0f);
-    skybox = glm::translate(skybox, cameraPos);
-    
+    ////////////////////////////////////
+    // Handle physics
+    ///////////////////////////////////
+
+    for (auto &i : active_scene.loaded_models) {
+
+      if (i.las_phys_calculation < (currentFrame + 0.05f) &&
+          i.physics_type == RIGID_BODY) {
+
+        if (i.accell_x >= dampening_coefficient) {
+          i.location_x = i.location_x + i.accell_x;
+          i.accell_x = i.accell_x - dampening_coefficient;
+          std::cout << i.location_x << " location " << i.accell_x
+                    << " accell_x " << std::endl;
+        }
+        if (i.accell_x < dampening_coefficient) {
+          i.accell_x = 0;
+        }
+
+        break;
+      }
+
+      i.las_phys_calculation = currentFrame;
+    }
+
     ////////////////////////////////////
     // render all meshes
     ////////////////////////////////////
     
     for (auto &i : active_scene.loaded_models) {
+
+      float parent_mesh_pos_x = i.location_x;
+      float parent_mesh_pos_y = i.location_y;
+      float parent_mesh_pos_z = i.location_z;
+
+      float parent_offset_theta_x = i.theta_x;
+      float parent_offset_theta_y = i.theta_y;
+      float parent_offset_theta_z = i.theta_z;
       
       for (auto &j : i.contained_meshes) {
 
@@ -386,11 +462,11 @@ int main() {
 	// change texture rendering or face rendering
 	//////////////////////////////////////
 
-	int render_type_loc = glGetUniformLocation(mainShader.ID, "render_type");
+	int disable_tex_shading_loc = glGetUniformLocation(mainShader.ID, "disable_tex_shading");
 	int face_color_loc = glGetUniformLocation(mainShader.ID, "face_color");
 
 	//copy render type (face shade / texture) and the face color to shader
-        glUniform1f(render_type_loc, j.render_type);
+        glUniform1f(disable_tex_shading_loc, j.disable_tex_shading);
 	glUniform4f(face_color_loc,
 		    j.face_color_r/255.0f,
 		    j.face_color_g/255.0f,
@@ -413,13 +489,15 @@ int main() {
         glm::mat4 model = glm::mat4(1.0f);
 
 	// setting mesh position transform
-	glm::vec3 mod_transform(j.location_x,j.location_y,j.location_z);	
+	glm::vec3 mod_transform(j.offset_pos_x + parent_mesh_pos_x,
+				j.offset_pos_y + parent_mesh_pos_y,
+				j.offset_pos_z + parent_mesh_pos_z);	
 	model = glm::translate(model, mod_transform);
 
 	// setting mesh rotation transform
-	float rad_theta_x = glm::radians(j.theta_x);
-	float rad_theta_y = glm::radians(j.theta_y);
-	float rad_theta_z = glm::radians(j.theta_z);
+	float rad_theta_x = glm::radians(j.offset_theta_x + parent_offset_theta_x);
+	float rad_theta_y = glm::radians(j.offset_theta_y + parent_offset_theta_y);
+	float rad_theta_z = glm::radians(j.offset_theta_z + parent_offset_theta_z);
 
 	glm::mat4 mat_rot_x = glm::rotate(glm::mat4(1.0f), rad_theta_x, glm::vec3(1.0f, 0.0f, 0.0f));
 	glm::mat4 mat_rot_y = glm::rotate(glm::mat4(1.0f), rad_theta_y, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -433,17 +511,60 @@ int main() {
         int viewLoc = glGetUniformLocation(mainShader.ID, "view");
         int projectionLoc = glGetUniformLocation(mainShader.ID, "projection");
 
-	// mesh type transforms
-        if(j.mesh_type == MESH_SKYBOX) {
+	// special model transformation handeling
+        switch (j.mesh_type) {
+
+        case MESH_SKYBOX: {
+          glm::mat4 skybox = glm::mat4(1.0f);
+	  glm::vec3 cpy_cam_pos = cameraPos;
+          skybox = glm::translate(skybox, cpy_cam_pos);
+          glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(skybox));
+          break;
+        }
+	  case MESH_LIGHT:{
+	  j.offset_pos_x = light_pos.x;
+	  j.offset_pos_y = light_pos.y;
+	  j.offset_pos_z = light_pos.z;
+	  glm::vec3 direction_mesh_2d = cameraPos - glm::vec3(j.offset_pos_x, j.offset_pos_y, j.offset_pos_z);
+	  direction_mesh_2d = glm::normalize(direction_mesh_2d);
+
+	  float rad_theta_x_mesh_2d = atan2(direction_mesh_2d.x,direction_mesh_2d.z) + 3.14/2;
+	  float rad_theta_y_mesh_2d = atan2(direction_mesh_2d.y,sqrt(pow(direction_mesh_2d.x,2) + pow(direction_mesh_2d.z,2))) + 3.14/2;
+
+	  rad_theta_y_mesh_2d = rad_theta_y_mesh_2d * -1;
+
+	  glm::mat4 mat_rot_x_mesh_2d = glm::rotate(glm::mat4(1.0f), rad_theta_x_mesh_2d, glm::vec3(0.0f, 1.0f, 0.0f));
+	  glm::mat4 mat_rot_y_mesh_2d = glm::rotate(glm::mat4(1.0f), rad_theta_y_mesh_2d, glm::vec3(0.0f, 0.0f, 1.0f));
+
+	  model = model * mat_rot_x_mesh_2d * mat_rot_y_mesh_2d;
 	  
-	  glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(skybox));
+          glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+          break;}
+        case MESH_SPRITE:{
+	  glm::vec3 direction_mesh_2d = cameraPos - glm::vec3(j.offset_pos_x, j.offset_pos_y, j.offset_pos_z);
+	  direction_mesh_2d = glm::normalize(direction_mesh_2d);
+
+	  float rad_theta_x_mesh_2d = atan2(direction_mesh_2d.x,direction_mesh_2d.z) + 3.14/2;
+	  float rad_theta_y_mesh_2d = atan2(direction_mesh_2d.y,sqrt(pow(direction_mesh_2d.x,2) + pow(direction_mesh_2d.z,2))) + 3.14/2;
+
+	  rad_theta_y_mesh_2d = rad_theta_y_mesh_2d * -1;
+
+	  glm::mat4 mat_rot_x_mesh_2d = glm::rotate(glm::mat4(1.0f), rad_theta_x_mesh_2d, glm::vec3(0.0f, 1.0f, 0.0f));
+	  glm::mat4 mat_rot_y_mesh_2d = glm::rotate(glm::mat4(1.0f), rad_theta_y_mesh_2d, glm::vec3(0.0f, 0.0f, 1.0f));
+
+	  model = model * mat_rot_x_mesh_2d * mat_rot_y_mesh_2d;
 	  
-	} else {
+          glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 	  
-	  glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));        
-	  
+          break;
 	}
-	
+        default: {
+          glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+          break;
+        }
+        }
+
         // upload view matrix and projection matrix to shader
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(proj));
@@ -469,7 +590,7 @@ int main() {
 	//tmp below
 
 	int light_source_loc = glGetUniformLocation(mainShader.ID, "light_source");
-	glUniform3f(light_source_loc, sin(currentFrame)*10.0f, 2.0f, cos(currentFrame)*10.0f);
+	glUniform3f(light_source_loc, light_pos.x,light_pos.y,light_pos.z);
 	int light_color_loc = glGetUniformLocation(mainShader.ID, "light_color");
 	glUniform3f(light_color_loc, 50.0f, 50.0f, 45.0f);
 	int light_strength_loc = glGetUniformLocation(mainShader.ID, "light_strength");

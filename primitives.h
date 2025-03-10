@@ -28,7 +28,16 @@ enum e_mesh_types {
   MESH_SKYBOX,
   MESH_ENTITY,
   MESH_LIGHT,
-  MESH_TRIANGLE
+  MESH_TRIANGLE,
+  MESH_SPRITE
+  
+};
+
+enum e_physics_type {
+
+  RIGID_BODY,
+  SOFT_BODY,
+  NON_PHYSICS
   
 };
 
@@ -60,9 +69,10 @@ class mesh {
   std::vector<float> mesh_tex_coordinates;
   std::vector<float> mesh_normals;
   std::string texture_path;
-  e_mesh_types mesh_type;
+  
+  e_mesh_types mesh_type = MESH_ENTITY;
 
-  float render_type = 0.0f;
+  float disable_tex_shading = 0.0f;
   float face_color_r = 20.0f;
   float face_color_g = 50.0f;
   float face_color_b = 80.0f;
@@ -76,20 +86,36 @@ class mesh {
   GLuint mes_tex_id;
   GLuint mesh_EBO;
 
-  float location_x = 0.0f;
-  float location_y = 0.0f;
-  float location_z = 0.0f;
+  float offset_pos_x = 0.0f;
+  float offset_pos_y = 0.0f;
+  float offset_pos_z = 0.0f;
 
-  float theta_x = 0.0f;
-  float theta_y = 0.0f;
-  float theta_z = 0.0f;
-
+  float offset_theta_x = 0.0f;
+  float offset_theta_y = 0.0f;
+  float offset_theta_z = 0.0f;
+  
 };
 
 class model {
  public:
+  
+  e_physics_type physics_type = NON_PHYSICS;
+
   std::vector<mesh> contained_meshes;
   
+  float location_x = 0.0f;
+  float location_y = 0.0f;
+  float location_z = 0.0f;
+  
+  float theta_x = 0.0f;
+  float theta_y = 0.0f;
+  float theta_z = 0.0f;  
+
+  float accell_x = 0.0f;
+  float accell_y = 0.0f;
+  float accell_z = 0.0f;
+
+  float las_phys_calculation = 0.0f;
 };
 
 class scene {

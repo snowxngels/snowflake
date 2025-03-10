@@ -9,7 +9,7 @@ uniform sampler2D texture1;
 
 uniform vec4 face_color;
 
-uniform float render_type;
+uniform float disable_tex_shading;
 
 uniform vec3 ambient_light_base;
 
@@ -35,7 +35,7 @@ void main()
 	float diff = max(dot(norm, lightDir), 0.0);
 	vec3 diffuse = diff * light_color;
 
-	float clampedRenderType = clamp(render_type, 0.0, 1.0);
+	float clampedRenderType = clamp(disable_tex_shading, 0.0, 1.0);
 
 	vec3 finalColor = mix(texture(texture1, TexCoord).rgb, face_color.rgb, clampedRenderType);
 
@@ -44,6 +44,6 @@ void main()
 	FragColor = vec4(clampedFinalColor * (ambient_light_base + diffuse * light_strength), 1.0f);
 
     } else {
-        FragColor = mix(texture(texture1, TexCoord), face_color, render_type);
+        FragColor = mix(texture(texture1, TexCoord), face_color, disable_tex_shading);
     }
 }

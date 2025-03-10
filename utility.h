@@ -27,6 +27,17 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
+void construct_fallback_uv_coordinates(mesh *reconstruct_mesh) {
+
+  unsigned int num_vertices = (reconstruct_mesh->mesh_vertices.size()/3)*2;
+
+  for(int i = 0; i < num_vertices; i++) {
+    reconstruct_mesh->mesh_tex_coordinates.push_back(std::rand());
+    reconstruct_mesh->mesh_tex_coordinates.push_back(std::rand());
+  }
+
+  return;
+}
 
 // Tex to slot
 GLuint bind_texture_to_slot(std::string to_load, unsigned int slot) {

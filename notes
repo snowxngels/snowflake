@@ -1,0 +1,5 @@
+calculate center of mesh + max excentricity from center for every mesh.
+compare all meshes against all meshes
+	-> if center of both meshes > max excentricity of both, skip mesh
+	-> if not: calculate if they collide:
+	   
