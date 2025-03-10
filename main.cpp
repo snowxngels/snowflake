@@ -4,9 +4,9 @@
 
 #include "loaders.h"
 #include "shader/shader_class.h"
-#define STB_IMAGE_IMPLEMENTATION
+
 #include "glad/glad.h"
-#include "libs/image/stb_image.h"
+#include "./utility.h"
 #include "./primitives.h"
 
 #include <GLFW/glfw3.h>
@@ -21,6 +21,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cstdint>
 
 // assimp
 #include <assimp/Importer.hpp>
@@ -35,7 +36,7 @@
 #define NEAR_CLIP_PLANE 0.1f
 #define FAR_CLIP_PLANE 100000.0f
 
-#define AMBIENT_LIGHTING_BASE 0.1f
+#define AMBIENT_LIGHTING_BASE 0.4f
 #define MAX_ALLOWED_LIGHTS 50
 // camera
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
@@ -57,6 +58,9 @@ double lastY = 0;
 double yaw = 0;
 double pitch = 0;
 
+// debug stuff
+uint64_t total_vertices = 0;
+ 
 //////////////////////////////////////////////
 // INPUT HANDLERS + CALLBACK FUNCTIONS
 //////////////////////////////////////////////
@@ -137,38 +141,6 @@ void processInput(GLFWwindow *window) {
       glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); // Release the mouse
     }
   }
-  
-}
-
-
-///////////////////////////////////////////////////////
-// UTILITY FUNCTIONS
-///////////////////////////////////////////////////////
-
-GLuint bind_texture_to_slot(std::string to_load, unsigned int slot) {
-  printf("trying to load textures into slot :%d\n", slot);
-  int width, height, nrChannels;
-  unsigned char *data =
-      stbi_load(to_load.c_str(), &width, &height, &nrChannels, 0);
-
-  unsigned int texture;
-  glGenTextures(1, &texture);
-  glActiveTexture(GL_TEXTURE0 + slot);
-  glBindTexture(GL_TEXTURE_2D, texture);
-
-  if (data) {
-    printf("deserialized image successfully.\n");
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB,
-                 GL_UNSIGNED_BYTE, data);
-    glGenerateMipmap(GL_TEXTURE_2D);
-  } else {
-    std::cout << "Failed to load texture" << std::endl;
-  }
-
-  stbi_image_free(data);
-  glBindTexture(GL_TEXTURE_2D, texture);
-
-  return texture;
 }
 
 ///////////////////////////////////////////////////////
@@ -229,7 +201,6 @@ int main() {
   model second_model;
   second_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/ball/ball.obj"));
   second_model.contained_meshes[0].location_y = 2.0f;
-  second_model.contained_meshes[0].render_type = 0.0f;
   active_scene.add_model_to_scene(second_model);
   
   model third_model;
@@ -279,39 +250,9 @@ int main() {
     for (auto &sub_mesh : i.contained_meshes) {
 
 
-      //calculate mesh vertex normals
-      std::vector<glm::vec3> vertexNormals; // buffer
-      size_t numVertices = sub_mesh.mesh_vertices.size() / 3;
-      vertexNormals.resize(numVertices, glm::vec3(0.0f));
-
-      for (size_t i = 0; i < sub_mesh.mesh_vertices.size(); i += 9) {
-
-        glm::vec3 v0(sub_mesh.mesh_vertices[i], sub_mesh.mesh_vertices[i + 1], sub_mesh.mesh_vertices[i + 2]); // Vertex 1
-        glm::vec3 v1(sub_mesh.mesh_vertices[i + 3], sub_mesh.mesh_vertices[i + 4],
-                     sub_mesh.mesh_vertices[i + 5]); // Vertex 2
-        glm::vec3 v2(sub_mesh.mesh_vertices[i + 6], sub_mesh.mesh_vertices[i + 7],
-                     sub_mesh.mesh_vertices[i + 8]); // Vertex 3
-
-        // Calculate the normal for the face
-        glm::vec3 faceNormal = glm::normalize(glm::cross(v1 - v0, v2 - v0));
-
-        // Accumulate the face normal to each vertex's normal
-        vertexNormals[i / 3] += faceNormal;     // Vertex 1
-        vertexNormals[i / 3 + 1] += faceNormal; // Vertex 2
-        vertexNormals[i / 3 + 2] += faceNormal; // Vertex 3
-      }
-
-      for (size_t i = 0; i < vertexNormals.size(); ++i) {
-        vertexNormals[i] = glm::normalize(vertexNormals[i]);
-      }
-      
-      for (const auto &normal : vertexNormals) {
-        sub_mesh.mesh_normals.push_back(normal.x);
-        sub_mesh.mesh_normals.push_back(normal.y);
-        sub_mesh.mesh_normals.push_back(normal.z);
-      }
-
-      std::cout << "done calculating x normals x = " << sub_mesh.mesh_normals.size() << std::endl;
+      //calculate mesh vertex normals + track vertex count for lolz
+      sub_mesh.mesh_normals = calculate_vert_normals(sub_mesh.mesh_vertices);
+      total_vertices = total_vertices + sub_mesh.mesh_vertices.size();
       
       //////////////////////////
       // BUFFERS
@@ -351,7 +292,7 @@ int main() {
                             (void *)0);
       glEnableVertexAttribArray(2);
 
-      std::cout << sub_mesh.mesh_VBO << " vbo " << sub_mesh.mesh_tex_VBO << " tex_vbo " << sub_mesh.mesh_norm_VBO << " norm_vbo " << std::endl;
+      //      std::cout << sub_mesh.mesh_VBO << " , " << sub_mesh.mesh_tex_VBO << " , " << sub_mesh.mesh_norm_VBO << " - mesh_vbo , tex_vbo and norm_vbo " << std::endl;
       
       /*
       glGenBuffers(1, &sub_mesh.mesh_EBO);
@@ -361,6 +302,8 @@ int main() {
       */ 
     }
   }
+
+  printf("finished importing %d meshes with %d vertices \n", active_scene.loaded_models.size(), total_vertices);
 
   Shader mainShader("default.vert", "default.frag");
 
@@ -377,7 +320,7 @@ int main() {
 
       j.mes_tex_id = bind_texture_to_slot( j.texture_path, loaded_textures);
 
-      std::cout << "loaded tex: " << j.texture_path << "in slot :" << loaded_textures << "with texture_id" << j.mes_tex_id << std::endl;
+      std::cout << "loaded texture: " << j.texture_path << "into slot :" << loaded_textures << " with texture_id: " << j.mes_tex_id << std::endl;
       
       loaded_textures++;
 
@@ -428,19 +371,6 @@ int main() {
     //skybox movement
     glm::mat4 skybox = glm::mat4(1.0f);
     skybox = glm::translate(skybox, cameraPos);
-
-    ////////////////////////////////////
-    // initialize all lights
-    ////////////////////////////////////
-
-    int num_lights_loc = glGetUniformLocation(mainShader.ID, "num_lights");
-    glUniform1i(num_lights_loc, MAX_ALLOWED_LIGHTS);
-
-    for (auto &i : active_scene.loaded_lights) {
-
-      
-
-    }    
     
     ////////////////////////////////////
     // render all meshes
@@ -474,28 +404,6 @@ int main() {
         if (glIsVertexArray(j.mesh_VAO) == GL_FALSE) {
           std::cout << "ERROR::VAO::INVALID_ID: " << j.mesh_VAO << std::endl;
         }
-
-	//////////////////////////////
-	// calculate lightning
-	//////////////////////////////
-
-	float face_brightness;
-
-	face_brightness = 1;
-	
-	int face_brightness_loc = glGetUniformLocation(mainShader.ID, "face_brightness");
-	int aff_by_light_loc = glGetUniformLocation(mainShader.ID, "affected_by_light");
-
-	glUniform1i(aff_by_light_loc,j.mesh_affected_by_light);
-
-	//tmp below
-
-	int light_source_loc = glGetUniformLocation(mainShader.ID, "light_source");
-	glUniform3f(light_source_loc, sin(currentFrame)*5.0f, 2.0f, cos(currentFrame)*5.0f);
-	int light_color_loc = glGetUniformLocation(mainShader.ID, "light_color");
-	glUniform3f(light_color_loc, 50.0f, 50.0f, 40.0f);
-	int light_strength_loc = glGetUniformLocation(mainShader.ID, "light_strength");
-	glUniform1f(light_strength_loc, 0.3f);
 	
 	//////////////////////////////
 	// translation and rotation
@@ -540,11 +448,37 @@ int main() {
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(proj));
 
-	//	std::cout << modelLoc << " model " << viewLoc << " view " << projectionLoc << " projection " << std::endl;	
+	//  #1 debug statement: std::cout << modelLoc << " model " << viewLoc << " view " << projectionLoc << " projection " << std::endl;	
         if (modelLoc == -1 || viewLoc == -1 || projectionLoc == -1) {
           std::cout << "ERROR::UNIFORM::LOCATION_NOT_FOUND - Loc" << std::endl;
         }
-	 
+
+	//////////////////////////////
+	// calculate lightning
+	//////////////////////////////
+
+	float face_brightness;
+
+	face_brightness = 1;
+	
+	int face_brightness_loc = glGetUniformLocation(mainShader.ID, "face_brightness");
+	int aff_by_light_loc = glGetUniformLocation(mainShader.ID, "affected_by_light");
+
+	glUniform1i(aff_by_light_loc,j.mesh_affected_by_light);
+
+	//tmp below
+
+	int light_source_loc = glGetUniformLocation(mainShader.ID, "light_source");
+	glUniform3f(light_source_loc, sin(currentFrame)*10.0f, 2.0f, cos(currentFrame)*10.0f);
+	int light_color_loc = glGetUniformLocation(mainShader.ID, "light_color");
+	glUniform3f(light_color_loc, 50.0f, 50.0f, 45.0f);
+	int light_strength_loc = glGetUniformLocation(mainShader.ID, "light_strength");
+	glUniform1f(light_strength_loc, 0.3f);
+
+	///////////////////////////
+	// RENDER EVERYTHING
+	//////////////////////////
+	
 	// glDrawElements(GL_TRIANGLES, j.mesh_indices.size(), GL_UNSIGNED_INT, 0);
 	glDrawArrays(GL_TRIANGLES,0,j.mesh_vertices.size());
 	
