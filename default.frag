@@ -1,6 +1,16 @@
 #version 330 core
-out vec4 FragColor;
 
+struct Material {
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    float shininess;
+}; 
+
+uniform Material material;
+
+// pipelines
+out vec4 FragColor;
 in vec3 NormalVec;
 in vec2 TexCoord;
 in vec3 FragPos;
@@ -13,7 +23,6 @@ uniform vec3 ambient_light_base;//base color (why did i name this so retarded)
 //data
 uniform sampler2D texture1;
 uniform vec4 face_color;
-uniform float face_brightness;
 uniform vec3 cameraPos;
 
 uniform vec3 light_color;
@@ -44,9 +53,8 @@ void main()
 
 	  // calc diffuse (more aligned light dir and normal of frag -> more light)
 	  float diff = max(dot(norm, lightDir), 0.0);
-	  diff = clamp(diff, 0.0f, 0.4f);
+	  diff = clamp(diff, 0.0f, 1.0f);
 	  vec3 diffuse = diff * light_color * light_strength;
-
 
 	  vec3 clampedFinalColorRGB = clamp(texture(texture1, TexCoord).rgb, 0.0f, 0.5f);
 

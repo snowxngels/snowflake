@@ -8,6 +8,7 @@
 #include "glad/glad.h"
 #include "./utility.h"
 #include "./primitives.h"
+#include "libs/tiny_gltf.h"
 
 #include <GLFW/glfw3.h>
 #include <glm/ext/matrix_transform.hpp>
@@ -128,16 +129,25 @@ void processInput(GLFWwindow *window) {
     glfwSetWindowShouldClose(window, true);
 
   float cameraSpeed = 10.0f * deltaTime;
-  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {cameraPos += cameraSpeed * cameraLookAt; std::cout << "W pressed" << std::endl;}
+  if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {cameraPos += cameraSpeed * glm::normalize(glm::vec3(cameraLookAt.x,0.0f,cameraLookAt.z)); }
     
-  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-    cameraPos -= cameraSpeed * cameraLookAt;
+  if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {cameraPos += cameraSpeed * glm::normalize(glm::vec3(-cameraLookAt.x,0.0f,-cameraLookAt.z)); }
+
   if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
     cameraPos -=
         glm::normalize(glm::cross(cameraLookAt, cameraUp)) * cameraSpeed;
+
   if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
     cameraPos +=
         glm::normalize(glm::cross(cameraLookAt, cameraUp)) * cameraSpeed;
+
+  if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+    cameraPos +=
+      glm::normalize(glm::vec3(0.0f,-1.0f,0.0f)) * cameraSpeed;
+
+  if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+    cameraPos +=
+      glm::normalize(glm::vec3(0.0f,1.0f,0.0f)) * cameraSpeed;
 
   if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) {
     if (lastMouseState == false) {
@@ -160,16 +170,6 @@ void processInput(GLFWwindow *window) {
     lastMouseState = false;
 
   }
-  /*
-  if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
-
-    for(auto i : active_scene.loaded_models){
-
-      if(i.physics_type==RIGID_BODY)
-	i.accell_x = 1.0f;
-      
-    }
-  }*/
 
   return;
   
@@ -225,33 +225,27 @@ int main() {
   scene active_scene;
   
   model first_model;
-  first_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/torus/torus.obj"));
+  first_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/teapot/teapot.obj"));
   first_model.theta_y = 0.0f;
   active_scene.add_model_to_scene(first_model);
   
   model second_model;
   second_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/ball/ball.obj"));
-  second_model.location_y = 2.0f;
+  second_model.location_y = 1.0f;
+  second_model.location_x = 4.0f;
   second_model.physics_type = RIGID_BODY;
   active_scene.add_model_to_scene(second_model);
   
   model third_model;
   third_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/floor/floor.obj"));
   third_model.location_y = -1.0f;
+  third_model.contained_meshes[0].specular_strength = 0.2f;
   active_scene.add_model_to_scene(third_model);
-  /*
-  model fourth_model;
-  fourth_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/arrow/arrow.obj"));
-  //  fourth_model.contained_meshes[0].disable_tex_shading = 0.0f;
-  fourth_model.location_x = 5.0f;
-  fourth_model.contained_meshes[0].mesh_type = MESH_SPRITE;
-  active_scene.add_model_to_scene(fourth_model);
-  */
   
   model skybox_model;
   skybox_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/skybox/skybox.obj"));
   skybox_model.contained_meshes[0].mesh_type = MESH_SKYBOX;
-  skybox_model.contained_meshes[0].mesh_affected_by_light = 0;
+  skybox_model.contained_meshes[0].shading_type = SHADING_NONE;
   active_scene.add_model_to_scene(skybox_model);
 
   light first_light;
@@ -414,6 +408,9 @@ int main() {
     ///////////////////////////////////
     
     glm::vec3 light_pos(sin(currentFrame)*10.0f, 2.0f, cos(currentFrame)*10.0f);
+
+    active_scene.loaded_models[0].location_x = sin(glfwGetTime());
+    
     
     // projection matrix
     int height = 0, width = 0;
@@ -491,16 +488,7 @@ int main() {
           std::cout << "ERROR::VAO::INVALID_ID: " << j.mesh_VAO << std::endl;
         }
 
-	////////////////////////////////////
-	// handle per mesh lighting (once per frame)
-	////////////////////////////////////
-	
-	GLint cameraPosLoc = glGetUniformLocation(mainShader.ID, "cameraPos");
-	glUniform3f(cameraPosLoc,cameraPos.x,cameraPos.y,cameraPos.z);
-	GLint specular_strengthLoc = glGetUniformLocation(mainShader.ID, "specular_strength");
-	glUniform1f(specular_strengthLoc,j.specular_strength);
-	
-	//////////////////////////////
+        //////////////////////////////
 	// translation and rotation
 	//////////////////////////////
 	
@@ -597,23 +585,43 @@ int main() {
 	// calculate lightning
 	//////////////////////////////
 
-	float face_brightness;
-
-	face_brightness = 1;
-	
-	int face_brightness_loc = glGetUniformLocation(mainShader.ID, "face_brightness");
+	//uniform locations
 	int aff_by_light_loc = glGetUniformLocation(mainShader.ID, "affected_by_light");
-
-	glUniform1i(aff_by_light_loc,j.mesh_affected_by_light);
-
-	//tmp below
-
 	int light_source_loc = glGetUniformLocation(mainShader.ID, "light_source");
-	glUniform3f(light_source_loc, light_pos.x,light_pos.y,light_pos.z);
 	int light_color_loc = glGetUniformLocation(mainShader.ID, "light_color");
-	glUniform3f(light_color_loc, 25.0f, 25.0f, 25.0f);
 	int light_strength_loc = glGetUniformLocation(mainShader.ID, "light_strength");
-	glUniform1f(light_strength_loc, 0.3f);
+	int cameraPosLoc = glGetUniformLocation(mainShader.ID, "cameraPos");
+	int specular_strengthLoc = glGetUniformLocation(mainShader.ID, "specular_strength");	
+
+	//write globals
+	glUniform3f(cameraPosLoc,cameraPos.x,cameraPos.y,cameraPos.z);
+	glUniform3f(light_source_loc, light_pos.x,light_pos.y,light_pos.z);
+	glUniform3f(light_color_loc, 25.0f, 25.0f, 25.0f);
+	glUniform1f(light_strength_loc, 0.1f);
+	
+
+	//write per mesh
+        switch(j.shading_type) {
+
+	case SHADING_PHONG: {
+	  glUniform1f(specular_strengthLoc,j.specular_strength);
+	  glUniform1i(aff_by_light_loc,1.0f);
+	  break;}
+
+	case SHADING_FACE: {
+	  glUniform1f(specular_strengthLoc,j.specular_strength);
+	  glUniform1i(aff_by_light_loc,1.0f);
+          break;}
+	  
+	case SHADING_FLAT: {
+	  glUniform1i(aff_by_light_loc,1.0f);
+	  break;}
+	  
+	case SHADING_NONE: {
+	  //not affected by light
+	  glUniform1i(aff_by_light_loc,0.0f);
+          break;}
+	}
 
 	///////////////////////////
 	// RENDER EVERYTHING

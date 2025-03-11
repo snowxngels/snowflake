@@ -23,6 +23,15 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
+enum e_shading_type {
+
+  SHADING_PHONG,
+  SHADING_FACE,
+  SHADING_FLAT,
+  SHADING_NONE
+  
+};
+
 enum e_mesh_types {
 
   MESH_SKYBOX,
@@ -71,7 +80,8 @@ class mesh {
   std::string texture_path;
   
   e_mesh_types mesh_type = MESH_ENTITY;
-
+  e_shading_type shading_type = SHADING_PHONG; 
+  
   float disable_tex_shading = 0.0f;
   float face_color_r = 20.0f;
   float face_color_g = 50.0f;
