@@ -58,6 +58,7 @@ float dampening_coefficient = 0.01f;
 bool isMouseGrabbed = true;
 bool isMouseOnCooldown = true;
 bool firstMouse = true;
+bool lastMouseState = false;
 double lastX = 0;
 double lastY = 0;
 double yaw = 0;
@@ -139,14 +140,25 @@ void processInput(GLFWwindow *window) {
         glm::normalize(glm::cross(cameraLookAt, cameraUp)) * cameraSpeed;
 
   if (glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS) {
-    isMouseGrabbed = !isMouseGrabbed; // Toggle the state
-    if (isMouseGrabbed) {
-      isMouseOnCooldown = true;
-      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); // Grab the mouse
-    } else {
-      isMouseOnCooldown = true;
-      glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL); // Release the mouse
+    if (lastMouseState == false) {
+      isMouseGrabbed = !isMouseGrabbed; // Toggle the state
+      if (isMouseGrabbed) {
+        isMouseOnCooldown = true;
+        glfwSetInputMode(window, GLFW_CURSOR,
+                         GLFW_CURSOR_DISABLED); // Grab the mouse
+      } else {
+        isMouseOnCooldown = true;
+        glfwSetInputMode(window, GLFW_CURSOR,
+                         GLFW_CURSOR_NORMAL); // Release the mouse
+      }
+      lastMouseState = true;
     }
+  }
+
+  if (glfwGetKey(window,GLFW_KEY_G) != GLFW_PRESS) {
+
+    lastMouseState = false;
+
   }
   /*
   if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
@@ -215,7 +227,6 @@ int main() {
   model first_model;
   first_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/torus/torus.obj"));
   first_model.theta_y = 0.0f;
-  first_model.contained_meshes[0].disable_tex_shading = 1.0f;
   active_scene.add_model_to_scene(first_model);
   
   model second_model;
@@ -412,7 +423,6 @@ int main() {
 
     // view matrix
     glm::mat4 view;
-    std::cout << cameraPos.x << " x " << cameraPos.y << " y " <<cameraPos.z << " z " << std::endl;
     view = glm::lookAt(cameraPos, cameraLookAt + cameraPos, cameraUp);
 
     ////////////////////////////////////
@@ -439,7 +449,7 @@ int main() {
 
       i.las_phys_calculation = currentFrame;
     }
-
+    
     ////////////////////////////////////
     // render all meshes
     ////////////////////////////////////
@@ -480,6 +490,15 @@ int main() {
         if (glIsVertexArray(j.mesh_VAO) == GL_FALSE) {
           std::cout << "ERROR::VAO::INVALID_ID: " << j.mesh_VAO << std::endl;
         }
+
+	////////////////////////////////////
+	// handle per mesh lighting (once per frame)
+	////////////////////////////////////
+	
+	GLint cameraPosLoc = glGetUniformLocation(mainShader.ID, "cameraPos");
+	glUniform3f(cameraPosLoc,cameraPos.x,cameraPos.y,cameraPos.z);
+	GLint specular_strengthLoc = glGetUniformLocation(mainShader.ID, "specular_strength");
+	glUniform1f(specular_strengthLoc,j.specular_strength);
 	
 	//////////////////////////////
 	// translation and rotation
@@ -592,7 +611,7 @@ int main() {
 	int light_source_loc = glGetUniformLocation(mainShader.ID, "light_source");
 	glUniform3f(light_source_loc, light_pos.x,light_pos.y,light_pos.z);
 	int light_color_loc = glGetUniformLocation(mainShader.ID, "light_color");
-	glUniform3f(light_color_loc, 50.0f, 50.0f, 45.0f);
+	glUniform3f(light_color_loc, 25.0f, 25.0f, 25.0f);
 	int light_strength_loc = glGetUniformLocation(mainShader.ID, "light_strength");
 	glUniform1f(light_strength_loc, 0.3f);
 

@@ -78,6 +78,7 @@ class mesh {
   float face_color_b = 80.0f;
 
   int mesh_affected_by_light = 1;
+  float specular_strength = 0.4f;
   
   GLuint mesh_VAO;
   GLuint mesh_VBO;
