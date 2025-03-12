@@ -3,6 +3,7 @@
 
 #include "loaders.h"
 #include "shader/shader_class.h"
+#include <glm/ext/quaternion_geometric.hpp>
 #define STB_IMAGE_IMPLEMENTATION
 #include "glad/glad.h"
 #include "libs/image/stb_image.h"
@@ -26,6 +27,13 @@
 #include <assimp/material.h>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
+
+struct tan_bin_glob {
+
+  std::vector<float> vert_tangents;
+  std::vector<float> vert_binormals;
+  
+};
 
 void construct_fallback_uv_coordinates(mesh *reconstruct_mesh) {
 
@@ -104,4 +112,94 @@ std::vector<float> calculate_vert_normals(std::vector<float> mesh_vertices) {
   std::cout << "done calculating " << mesh_normals.size() << " normals"
             << std::endl;
   return mesh_normals;
+}
+
+tan_bin_glob calculate_vert_tan_bin(std::vector<float> mesh_vertices,
+                                           std::vector<float> mesh_normals,
+					   std::vector<float> texture_coordinates) {
+  
+  std::vector<float> vert_tangents;
+  std::vector<float> vert_binormals;
+
+  tan_bin_glob return_glob;
+  
+  vert_tangents.resize(mesh_vertices.size());
+  vert_binormals.resize(mesh_vertices.size());
+  
+  for (size_t i = 0; i < mesh_vertices.size(); i += 9) {
+
+    glm::vec3 v0(mesh_vertices[i], mesh_vertices[i + 1],
+		 mesh_vertices[i + 2]); // Vertex 1
+    glm::vec3 v1(mesh_vertices[i + 3], mesh_vertices[i + 4],
+		 mesh_vertices[i + 5]); // Vertex 2
+    glm::vec3 v2(mesh_vertices[i + 6], mesh_vertices[i + 7],
+		 mesh_vertices[i + 8]); // Vertex 3
+
+    glm::vec2 t0(texture_coordinates[i], texture_coordinates[i + 1]); // Vertex 1
+    glm::vec2 t1(texture_coordinates[i+2], texture_coordinates[i + 3]); // Vertex 2
+    glm::vec2 t2(texture_coordinates[i+4], texture_coordinates[i + 5]); // Vertex 3
+	    
+    glm::vec3 e1(v1-v0);
+    glm::vec3 e2(v2-v0);
+
+    glm::vec2 delta_uv_1(t1-t0);
+    glm::vec2 delta_uv_2(t2-t0);
+
+    //shoutout wikipedia
+    float f = 1/((delta_uv_1.x * delta_uv_2.y) - (delta_uv_1.y * delta_uv_2.x));
+
+    glm::vec3 tangent = f * ((delta_uv_2.y * e1) - (delta_uv_1.y * e2));
+    glm::vec3 bitangent = f * ((-delta_uv_1.x * e1) + (delta_uv_1.x * e2));
+
+    for(int vert_id = 0; vert_id < 3; vert_id++) {
+
+      vert_tangents[i + vert_id] += tangent.x;
+      vert_tangents[i + vert_id + 1] += tangent.y;
+      vert_tangents[i + vert_id + 2] += tangent.z;
+
+      vert_binormals[i + vert_id] += bitangent.x;
+      vert_binormals[i + vert_id + 1] += bitangent.y;
+      vert_binormals[i + vert_id + 2] += bitangent.z;
+      
+    }
+    
+  }
+
+  //normalize tangents
+  for(int i = 0; i < vert_tangents.size(); i = i+3) {
+
+    glm::vec3 to_norm(vert_tangents[i],vert_tangents[i+1],vert_tangents[i+2]);
+    to_norm = glm::normalize(to_norm);
+    vert_tangents[i] = to_norm.x;
+    vert_tangents[i+1] = to_norm.y;
+    vert_tangents[i+2] = to_norm.z;
+    
+  }
+
+    //normalize binormals
+  for(int i = 0; i < vert_binormals.size(); i = i+3) {
+
+    glm::vec3 to_norm(vert_binormals[i],vert_binormals[i+1],vert_binormals[i+2]);
+    to_norm = glm::normalize(to_norm);
+    vert_binormals[i] = to_norm.x;
+    vert_binormals[i+1] = to_norm.y;
+    vert_binormals[i+2] = to_norm.z;
+    
+  }
+
+  // optional?
+  /*
+    for (int i = 0; i < numVertices; i++) {
+    // Ensure the tangent is orthogonal to the normal
+    tangent[i] = normalize(tangent[i] - dot(tangent[i], normal[i]) * normal[i]);
+    // Recalculate the bitangent
+    binormal[i] = cross(normal[i], tangent[i]);
+    }
+    
+  */
+
+  return_glob.vert_binormals = vert_binormals;
+  return_glob.vert_tangents = vert_tangents;
+
+  return return_glob;
 }

@@ -65,6 +65,8 @@ double lastY = 0;
 double yaw = 0;
 double pitch = 0;
 
+float cameraBaseSpeed = 1.0f;
+
 // debug stuff
 uint64_t total_vertices = 0;
 unsigned int window_width = 1900;
@@ -75,6 +77,18 @@ unsigned int window_heigh = 1020;
 //////////////////////////////////////////////
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
   glViewport(0, 0, width, height);
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+
+  std::cout << "Scroll offset: (" << xoffset << ", " << yoffset << ")\n";
+
+  cameraBaseSpeed = cameraBaseSpeed + static_cast<float>(yoffset) * 0.1f;
+
+  std::cout << cameraBaseSpeed << std::endl;
+
+  if(cameraBaseSpeed < 0.1f) {cameraBaseSpeed = 0.1f;}
+  
 }
 
 void mouse_callback(GLFWwindow *window, double xpos, double ypos) {
@@ -128,7 +142,7 @@ void processInput(GLFWwindow *window) {
   if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     glfwSetWindowShouldClose(window, true);
 
-  float cameraSpeed = 10.0f * deltaTime;
+  float cameraSpeed = cameraBaseSpeed * 10.0f * deltaTime;
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {cameraPos += cameraSpeed * glm::normalize(glm::vec3(cameraLookAt.x,0.0f,cameraLookAt.z)); }
     
   if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {cameraPos += cameraSpeed * glm::normalize(glm::vec3(-cameraLookAt.x,0.0f,-cameraLookAt.z)); }
@@ -204,13 +218,14 @@ int main() {
   // setup
   glEnable(GL_DEPTH_TEST);
 
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+  glfwSetScrollCallback(window, scroll_callback);
   glfwSetCursorPosCallback(window, mouse_callback);
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -230,24 +245,29 @@ int main() {
   active_scene.add_model_to_scene(first_model);
   
   model second_model;
-  second_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/ball/ball.obj"));
+  second_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/floor/floor.obj"));
   second_model.location_y = 1.0f;
   second_model.location_x = 4.0f;
   second_model.physics_type = RIGID_BODY;
+  second_model.contained_meshes[0].shading_type = SHADING_PBR;
   active_scene.add_model_to_scene(second_model);
-  
+
+  /*
   model third_model;
-  third_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/floor/floor.obj"));
+  third_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/levi/levi.obj"));
   third_model.location_y = -1.0f;
   third_model.contained_meshes[0].specular_strength = 0.2f;
   active_scene.add_model_to_scene(third_model);
-  
+  */
+
+  /*
   model skybox_model;
   skybox_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/skybox/skybox.obj"));
   skybox_model.contained_meshes[0].mesh_type = MESH_SKYBOX;
   skybox_model.contained_meshes[0].shading_type = SHADING_NONE;
   active_scene.add_model_to_scene(skybox_model);
-
+  */
+  
   light first_light;
   first_light.location_x = 5.0f;
   first_light.location_y = 1.0f;
@@ -278,12 +298,12 @@ int main() {
 
     model light_source_visualizer;
     light_source_visualizer.contained_meshes.push_back(import_obj_mesh_rev2("assets/light_source/light_source.obj"));
+    light_source_visualizer.contained_meshes[0].shading_type = SHADING_NONE;
     light_source_visualizer.contained_meshes[0].mesh_type = MESH_LIGHT;
     light_source_visualizer.contained_meshes[0].mesh_affected_by_light = 0.0f;
     active_scene.loaded_models.push_back(light_source_visualizer);
 
   }
-  
 
   ////////////////////////////////////
   // initializing mesh buffers
@@ -295,10 +315,21 @@ int main() {
 
     for (auto &sub_mesh : i.contained_meshes) {
 
+      ////////////////////////////
+      // GENERATE MISSING GEOMETRY
+      ////////////////////////////
 
       //calculate mesh vertex normals + track vertex count for lolz
       sub_mesh.mesh_normals = calculate_vert_normals(sub_mesh.mesh_vertices);
       total_vertices = total_vertices + sub_mesh.mesh_vertices.size();
+
+      //calculate vertex tangents / binormals
+      tan_bin_glob retglob = calculate_vert_tan_bin(sub_mesh.mesh_vertices,
+						       sub_mesh.mesh_normals,
+						       sub_mesh.mesh_tex_coordinates);
+      
+      sub_mesh.mesh_binormals = retglob.vert_binormals;
+      sub_mesh.mesh_tangents = retglob.vert_tangents;
       
       //////////////////////////
       // BUFFERS
@@ -313,7 +344,6 @@ int main() {
       glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_VBO);
       glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_vertices.size() * sizeof(float),
                    sub_mesh.mesh_vertices.data(), GL_STATIC_DRAW);
-      // mesh stride
       glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             (void *)0);
       glEnableVertexAttribArray(0);
@@ -323,7 +353,6 @@ int main() {
       glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_tex_VBO);
       glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_tex_coordinates.size() * sizeof(float),
                    sub_mesh.mesh_tex_coordinates.data(), GL_STATIC_DRAW);
-      // texture stride
       glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
                             (void *)0);
       glEnableVertexAttribArray(1);
@@ -333,10 +362,27 @@ int main() {
       glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_norm_VBO);
       glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_normals.size() * sizeof(float),
                    sub_mesh.mesh_normals.data(), GL_STATIC_DRAW);
-      // normals stride
       glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             (void *)0);
       glEnableVertexAttribArray(2);
+
+      // vbo binormals
+      glGenBuffers(1, &sub_mesh.mesh_binorm_VBO);
+      glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_binorm_VBO);
+      glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_binormals.size() * sizeof(float),
+                   sub_mesh.mesh_binormals.data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                            (void *)0);
+      glEnableVertexAttribArray(3);
+
+      // vbo tangents
+      glGenBuffers(1, &sub_mesh.mesh_tan_VBO);
+      glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_tan_VBO);
+      glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_tangents.size() * sizeof(float),
+                   sub_mesh.mesh_tangents.data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                            (void *)0);
+      glEnableVertexAttribArray(4);
 
       //      std::cout << sub_mesh.mesh_VBO << " , " << sub_mesh.mesh_tex_VBO << " , " << sub_mesh.mesh_norm_VBO << " - mesh_vbo , tex_vbo and norm_vbo " << std::endl;
 
@@ -345,8 +391,13 @@ int main() {
 
   printf("finished importing %d meshes with %d vertices \n", active_scene.loaded_models.size(), total_vertices);
 
-  Shader mainShader("default.vert", "default.frag");
-  mainShader.use();
+  Shader phong_shader("phong_vs.glsl", "phong_fs.glsl");
+  //init shader
+  phong_shader.use();
+
+  Shader pbr_shader("pbr_vs.glsl", "pbr_fs.glsl");
+  //init shader
+  pbr_shader.use();
 
   printf("trying to import a texture...\n");
 
@@ -356,15 +407,65 @@ int main() {
   
   unsigned int loaded_textures = 0;
 
-  for(auto &i : active_scene.loaded_models) {
-    for(auto &j : i.contained_meshes) {
+  for (auto &i : active_scene.loaded_models) {
+    for (auto &j : i.contained_meshes) {
 
-      if(j.texture_path != ""){
-	j.mes_tex_id = bind_texture_to_slot( j.texture_path, loaded_textures);
-	std::cout << "loaded texture: " << j.texture_path << "into slot :" << loaded_textures << " with texture_id: " << j.mes_tex_id << std::endl;
+      if (j.texture_path != "" || j.albedo_texture_path != "") {
+
+	switch (j.shading_type) {
+
+        case SHADING_PBR: {
+
+          std::cout << "loading texture : " << j.albedo_texture_path
+                    << "into slot :" << loaded_textures
+                    << " with texture_id: " << j.mesh_albedo_texture_id << std::endl;	  
+          j.mesh_albedo_texture_id =
+              bind_texture_to_slot(j.albedo_texture_path, loaded_textures);
+          loaded_textures++;
+	  
+          std::cout << "loading texture : " << j.normal_texture_path
+                    << "into slot :" << loaded_textures
+                    << " with texture_id: " << j.mesh_normal_texture_id << std::endl;
+          j.mesh_normal_texture_id =
+	    bind_texture_to_slot(j.normal_texture_path, loaded_textures);
+          loaded_textures++;
+
+	  std::cout << "loading texture : " << j.roughness_texture_path
+                    << "into slot :" << loaded_textures
+                    << " with texture_id: " << j.mesh_roughness_texture_id << std::endl;
+          j.mesh_roughness_texture_id =
+              bind_texture_to_slot(j.roughness_texture_path, loaded_textures);
+          loaded_textures++;
+
+	  std::cout << "loading texture : " << j.metallic_texture_path
+                    << "into slot :" << loaded_textures
+                    << " with texture_id: " << j.mesh_metallic_texture_id << std::endl;
+          j.mesh_metallic_texture_id =
+              bind_texture_to_slot(j.metallic_texture_path, loaded_textures);
+          loaded_textures++;
+
+
+	  std::cout << "loading texture : " << j.ambient_occlusion_texture_path
+                    << "into slot :" << loaded_textures
+                    << " with texture_id: " << j.mesh_ambient_occlusion_texture_id << std::endl;
+          j.mesh_ambient_occlusion_texture_id = bind_texture_to_slot(
+              j.ambient_occlusion_texture_path, loaded_textures);
+          loaded_textures++;
+	  break;
+        }
+
+        default: {
+
+          j.mes_tex_id = bind_texture_to_slot(j.texture_path, loaded_textures);
+          std::cout << "loading texture : " << j.texture_path
+                    << "into slot :" << loaded_textures
+                    << " with texture_id: " << j.mes_tex_id << std::endl;
+        }
+        }
       } else {
-	std::cout << "no texture path in mesh! using fallback texture! + face shading" << std::endl;
 
+        // no texture paths in file, using face shading
+        std::cout << "no texture path in mesh! using fallback texture! + face shading" << std::endl;
         //	j.mesh_affected_by_light = 0.0f;
 	j.disable_tex_shading = 0.0f;
 
@@ -373,18 +474,16 @@ int main() {
         j.mes_tex_id = bind_texture_to_slot( "assets/fallback/fallback.jpg", loaded_textures);
 	std::cout << "loaded fallback tex into slot :" << loaded_textures << " with texture_id: " << j.mes_tex_id << std::endl;
       }
-      
-      loaded_textures++;
 
+      loaded_textures++;
     }
-    
   }
-  
+
   //////////////////////////////////////////
   // setting up global values before rendering loop
   //////////////////////////////////////////
 
-  int ambient_light_base_loc = glGetUniformLocation(mainShader.ID, "ambient_light_base");  
+  int ambient_light_base_loc = glGetUniformLocation(phong_shader.ID, "ambient_light_base");  
   glUniform3f(ambient_light_base_loc,AMBIENT_LIGHTING_BASE,AMBIENT_LIGHTING_BASE,AMBIENT_LIGHTING_BASE);
   
   ////////////////////////
@@ -407,10 +506,12 @@ int main() {
     // DEMO MOVEMENT CODE
     ///////////////////////////////////
     
-    glm::vec3 light_pos(sin(currentFrame)*10.0f, 2.0f, cos(currentFrame)*10.0f);
+    glm::vec3 light_pos(sin(glfwGetTime())*5.0f, 2.0f, 0.0f);
 
-    active_scene.loaded_models[0].location_x = sin(glfwGetTime());
-    
+    //active_scene.loaded_models[1].location_x = sin(glfwGetTime()) * 7.0f;
+    //    active_scene.loaded_models[1].location_y = cos(glfwGetTime()) * 7.0f;
+    //    active_scene.loaded_models[1].theta_x = sin(glfwGetTime()*0.2) * 360;
+    //active_scene.loaded_models[1].theta_y = cos(glfwGetTime()*0.2) * 360;
     
     // projection matrix
     int height = 0, width = 0;
@@ -463,31 +564,113 @@ int main() {
       
       for (auto &j : i.contained_meshes) {
 
-	mainShader.use();
-		
-	//////////////////////////////////////
-	// change texture rendering or face rendering
-	//////////////////////////////////////
+	//////////////////////////////
+	// calculate lightning
+	//////////////////////////////
 
-	int disable_tex_shading_loc = glGetUniformLocation(mainShader.ID, "disable_tex_shading");
-	int face_color_loc = glGetUniformLocation(mainShader.ID, "face_color");
+	//uniform locations (phong specific)
+	int aff_by_light_loc = glGetUniformLocation(phong_shader.ID, "affected_by_light");
+	int light_source_loc = glGetUniformLocation(phong_shader.ID, "light_source");
+	int light_color_loc = glGetUniformLocation(phong_shader.ID, "light_color");
+	int light_strength_loc = glGetUniformLocation(phong_shader.ID, "light_strength");
+	int cameraPosLoc = glGetUniformLocation(phong_shader.ID, "cameraPos");
+	int specular_strengthLoc = glGetUniformLocation(phong_shader.ID, "specular_strength");
+	int disable_tex_shading_loc = glGetUniformLocation(phong_shader.ID, "disable_tex_shading");
+	int face_color_loc = glGetUniformLocation(phong_shader.ID, "face_color");
 
-	//copy render type (face shade / texture) and the face color to shader
-        glUniform1f(disable_tex_shading_loc, j.disable_tex_shading);
+	//uniform locations (pbr specific)
+	int light_source_loc_pbr = glGetUniformLocation(pbr_shader.ID, "light_source");
+	int cameraPosLoc_pbr = glGetUniformLocation(pbr_shader.ID, "cameraPos");
+	int light_color_loc_pbr = glGetUniformLocation(pbr_shader.ID, "light_color");
+	
+	//write global uniforms
+	glUniform3f(cameraPosLoc,cameraPos.x,cameraPos.y,cameraPos.z);
+	glUniform3f(light_source_loc, light_pos.x,light_pos.y,light_pos.z);
+	glUniform3f(light_color_loc, 25.0f, 25.0f, 25.0f);
+	glUniform1f(light_strength_loc, 0.1f);
 	glUniform4f(face_color_loc,
 		    j.face_color_r/255.0f,
 		    j.face_color_g/255.0f,
 		    j.face_color_b/255.0f,
 		    1.0f);
-	
-        // TEXTURE (i coded this on accident no clue why it works)
-        glBindTexture(GL_TEXTURE_2D, j.mes_tex_id);
-        mainShader.setInt("texture1", loaded_textures - 1);
-        glBindVertexArray(j.mesh_VAO);
-        if (glIsVertexArray(j.mesh_VAO) == GL_FALSE) {
-          std::cout << "ERROR::VAO::INVALID_ID: " << j.mesh_VAO << std::endl;
-        }
+	//shading specific uniforms
+        switch(j.shading_type) {
 
+	case SHADING_PBR: {
+	  pbr_shader.use();
+
+	  glBindTexture(GL_TEXTURE_2D, j.mesh_albedo_texture_id);
+          pbr_shader.setInt("albedoTexture", 1);
+
+	  glBindTexture(GL_TEXTURE_2D, j.mesh_normal_texture_id);
+          pbr_shader.setInt("normalTexture", 2);
+
+	  glBindTexture(GL_TEXTURE_2D, j.mesh_metallic_texture_id);
+          pbr_shader.setInt("metallicTexture", 3);
+
+	  glBindTexture(GL_TEXTURE_2D, j.mesh_roughness_texture_id);
+          pbr_shader.setInt("roughnessTexture", 4);
+
+	  glBindTexture(GL_TEXTURE_2D, j.mesh_ambient_occlusion_texture_id);
+          pbr_shader.setInt("aoTexture", 5);
+
+          //write global uniforms
+	  glUniform3f(cameraPosLoc_pbr,cameraPos.x,cameraPos.y,cameraPos.z);
+	  glUniform3f(light_source_loc_pbr, light_pos.x,light_pos.y,light_pos.z);
+	  glUniform3f(light_color_loc_pbr, 25.0f, 25.0f, 25.0f);
+	  
+          //bind mesh vao
+          glBindVertexArray(j.mesh_VAO);
+          if (glIsVertexArray(j.mesh_VAO) == GL_FALSE) {
+            std::cout << "ERROR::VAO::INVALID_ID: " << j.mesh_VAO << std::endl;
+          }
+	  
+          break;
+	}
+
+	case SHADING_PHONG: {
+	  phong_shader.use();
+	  glUniform1f(disable_tex_shading_loc, 0.0f);
+	  glUniform1f(specular_strengthLoc,j.specular_strength);
+	  glUniform1i(aff_by_light_loc,1.0f);
+	  }
+
+	case SHADING_FACE: {
+	  phong_shader.use();
+	  glUniform1f(disable_tex_shading_loc, 1.0f);
+	  glUniform1f(specular_strengthLoc,j.specular_strength);
+	  glUniform1i(aff_by_light_loc,1.0f);
+          }
+	  
+	case SHADING_FLAT: {
+	  glUniform1f(disable_tex_shading_loc, 0.0f);
+	  phong_shader.use();
+	  glUniform1i(aff_by_light_loc,1.0f);
+	  }
+	  
+	case SHADING_NONE: {
+	  //not affected by light
+	  phong_shader.use();
+	  glUniform1f(disable_tex_shading_loc, 0.0f);
+          glUniform1i(aff_by_light_loc,0.0f);
+          }
+
+        default: {
+
+          // Upload textures + bind meshes VAO to state machine
+          //	glActiveTexture(j.mes_tex_id);
+          glBindTexture(GL_TEXTURE_2D, j.mes_tex_id);
+          phong_shader.setInt("texture1", loaded_textures - 1);
+
+          glBindVertexArray(j.mesh_VAO);
+          if (glIsVertexArray(j.mesh_VAO) == GL_FALSE) {
+            std::cout << "ERROR::VAO::INVALID_ID: " << j.mesh_VAO << std::endl;
+          }
+	  
+        }
+	  
+        }
+		
         //////////////////////////////
 	// translation and rotation
 	//////////////////////////////
@@ -514,62 +697,87 @@ int main() {
 	model = model * mat_rot;
 	
         // upload model matrix to shader
-	int modelLoc = glGetUniformLocation(mainShader.ID, "model");
-        int viewLoc = glGetUniformLocation(mainShader.ID, "view");
-        int projectionLoc = glGetUniformLocation(mainShader.ID, "projection");
+	int modelLoc = glGetUniformLocation(phong_shader.ID, "model");
+        int viewLoc = glGetUniformLocation(phong_shader.ID, "view");
+        int projectionLoc = glGetUniformLocation(phong_shader.ID, "projection");
 
-	// special model transformation handeling
+	// mesh type specific transforms
         switch (j.mesh_type) {
 
         case MESH_SKYBOX: {
           glm::mat4 skybox = glm::mat4(1.0f);
-	  glm::vec3 cpy_cam_pos = cameraPos;
+          glm::vec3 cpy_cam_pos = cameraPos;
           skybox = glm::translate(skybox, cpy_cam_pos);
           glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(skybox));
           break;
         }
-	  case MESH_LIGHT:{
-	  j.offset_pos_x = light_pos.x;
-	  j.offset_pos_y = light_pos.y;
-	  j.offset_pos_z = light_pos.z;
-	  glm::vec3 direction_mesh_2d = cameraPos - glm::vec3(j.offset_pos_x, j.offset_pos_y, j.offset_pos_z);
-	  direction_mesh_2d = glm::normalize(direction_mesh_2d);
 
-	  float rad_theta_x_mesh_2d = atan2(direction_mesh_2d.x,direction_mesh_2d.z) + 3.14/2;
-	  float rad_theta_y_mesh_2d = atan2(direction_mesh_2d.y,sqrt(pow(direction_mesh_2d.x,2) + pow(direction_mesh_2d.z,2))) + 3.14/2;
+        case MESH_LIGHT: {
+          j.offset_pos_x = light_pos.x;
+          j.offset_pos_y = light_pos.y;
+          j.offset_pos_z = light_pos.z;
+          glm::vec3 direction_mesh_2d =
+              cameraPos -
+              glm::vec3(j.offset_pos_x, j.offset_pos_y, j.offset_pos_z);
+          direction_mesh_2d = glm::normalize(direction_mesh_2d);
 
-	  rad_theta_y_mesh_2d = rad_theta_y_mesh_2d * -1;
+          float rad_theta_x_mesh_2d =
+              atan2(direction_mesh_2d.x, direction_mesh_2d.z) + 3.14 / 2;
+          float rad_theta_y_mesh_2d =
+              atan2(direction_mesh_2d.y, sqrt(pow(direction_mesh_2d.x, 2) +
+                                              pow(direction_mesh_2d.z, 2))) +
+              3.14 / 2;
 
-	  glm::mat4 mat_rot_x_mesh_2d = glm::rotate(glm::mat4(1.0f), rad_theta_x_mesh_2d, glm::vec3(0.0f, 1.0f, 0.0f));
-	  glm::mat4 mat_rot_y_mesh_2d = glm::rotate(glm::mat4(1.0f), rad_theta_y_mesh_2d, glm::vec3(0.0f, 0.0f, 1.0f));
+          rad_theta_y_mesh_2d = rad_theta_y_mesh_2d * -1;
 
-	  model = model * mat_rot_x_mesh_2d * mat_rot_y_mesh_2d;
-	  
+          glm::mat4 mat_rot_x_mesh_2d =
+              glm::rotate(glm::mat4(1.0f), rad_theta_x_mesh_2d,
+                          glm::vec3(0.0f, 1.0f, 0.0f));
+          glm::mat4 mat_rot_y_mesh_2d =
+              glm::rotate(glm::mat4(1.0f), rad_theta_y_mesh_2d,
+                          glm::vec3(0.0f, 0.0f, 1.0f));
+
+          model = model * mat_rot_x_mesh_2d * mat_rot_y_mesh_2d;
+
           glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
-          break;}
-        case MESH_SPRITE:{
-	  glm::vec3 direction_mesh_2d = cameraPos - glm::vec3(j.offset_pos_x, j.offset_pos_y, j.offset_pos_z);
-	  direction_mesh_2d = glm::normalize(direction_mesh_2d);
-
-	  float rad_theta_x_mesh_2d = atan2(direction_mesh_2d.x,direction_mesh_2d.z) + 3.14/2;
-	  float rad_theta_y_mesh_2d = atan2(direction_mesh_2d.y,sqrt(pow(direction_mesh_2d.x,2) + pow(direction_mesh_2d.z,2))) + 3.14/2;
-
-	  rad_theta_y_mesh_2d = rad_theta_y_mesh_2d * -1;
-
-	  glm::mat4 mat_rot_x_mesh_2d = glm::rotate(glm::mat4(1.0f), rad_theta_x_mesh_2d, glm::vec3(0.0f, 1.0f, 0.0f));
-	  glm::mat4 mat_rot_y_mesh_2d = glm::rotate(glm::mat4(1.0f), rad_theta_y_mesh_2d, glm::vec3(0.0f, 0.0f, 1.0f));
-
-	  model = model * mat_rot_x_mesh_2d * mat_rot_y_mesh_2d;
-	  
-          glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-	  
           break;
-	}
+        }
+
+        case MESH_SPRITE: {
+          glm::vec3 direction_mesh_2d =
+              cameraPos -
+              glm::vec3(j.offset_pos_x, j.offset_pos_y, j.offset_pos_z);
+          direction_mesh_2d = glm::normalize(direction_mesh_2d);
+
+          float rad_theta_x_mesh_2d =
+              atan2(direction_mesh_2d.x, direction_mesh_2d.z) + 3.14 / 2;
+          float rad_theta_y_mesh_2d =
+              atan2(direction_mesh_2d.y, sqrt(pow(direction_mesh_2d.x, 2) +
+                                              pow(direction_mesh_2d.z, 2))) +
+              3.14 / 2;
+
+          rad_theta_y_mesh_2d = rad_theta_y_mesh_2d * -1;
+
+          glm::mat4 mat_rot_x_mesh_2d =
+              glm::rotate(glm::mat4(1.0f), rad_theta_x_mesh_2d,
+                          glm::vec3(0.0f, 1.0f, 0.0f));
+          glm::mat4 mat_rot_y_mesh_2d =
+              glm::rotate(glm::mat4(1.0f), rad_theta_y_mesh_2d,
+                          glm::vec3(0.0f, 0.0f, 1.0f));
+
+          model = model * mat_rot_x_mesh_2d * mat_rot_y_mesh_2d;
+
+          glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+          break;
+        }
+	  
         default: {
           glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
           break;
         }
+	  
         }
 
         // upload view matrix and projection matrix to shader
@@ -580,48 +788,6 @@ int main() {
         if (modelLoc == -1 || viewLoc == -1 || projectionLoc == -1) {
           std::cout << "ERROR::UNIFORM::LOCATION_NOT_FOUND - Loc" << std::endl;
         }
-
-	//////////////////////////////
-	// calculate lightning
-	//////////////////////////////
-
-	//uniform locations
-	int aff_by_light_loc = glGetUniformLocation(mainShader.ID, "affected_by_light");
-	int light_source_loc = glGetUniformLocation(mainShader.ID, "light_source");
-	int light_color_loc = glGetUniformLocation(mainShader.ID, "light_color");
-	int light_strength_loc = glGetUniformLocation(mainShader.ID, "light_strength");
-	int cameraPosLoc = glGetUniformLocation(mainShader.ID, "cameraPos");
-	int specular_strengthLoc = glGetUniformLocation(mainShader.ID, "specular_strength");	
-
-	//write globals
-	glUniform3f(cameraPosLoc,cameraPos.x,cameraPos.y,cameraPos.z);
-	glUniform3f(light_source_loc, light_pos.x,light_pos.y,light_pos.z);
-	glUniform3f(light_color_loc, 25.0f, 25.0f, 25.0f);
-	glUniform1f(light_strength_loc, 0.1f);
-	
-
-	//write per mesh
-        switch(j.shading_type) {
-
-	case SHADING_PHONG: {
-	  glUniform1f(specular_strengthLoc,j.specular_strength);
-	  glUniform1i(aff_by_light_loc,1.0f);
-	  break;}
-
-	case SHADING_FACE: {
-	  glUniform1f(specular_strengthLoc,j.specular_strength);
-	  glUniform1i(aff_by_light_loc,1.0f);
-          break;}
-	  
-	case SHADING_FLAT: {
-	  glUniform1i(aff_by_light_loc,1.0f);
-	  break;}
-	  
-	case SHADING_NONE: {
-	  //not affected by light
-	  glUniform1i(aff_by_light_loc,0.0f);
-          break;}
-	}
 
 	///////////////////////////
 	// RENDER EVERYTHING

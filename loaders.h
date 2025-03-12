@@ -55,11 +55,14 @@ mesh import_obj_mesh_rev2(std::string file_path) {
 
 	if(line[0] == 't') {
 
-	  std::string file_path;
-	  s >> junk >> file_path;
+	  if(line[1] == 'a') {std::string file_path; s >> junk >> file_path; output.albedo_texture_path = file_path;}
+	  if(line[1] == 'n') {std::string file_path; s >> junk >> file_path; output.normal_texture_path = file_path;}
+	  if(line[1] == 'o') {std::string file_path; s >> junk >> file_path; output.ambient_occlusion_texture_path = file_path;}
+	  if(line[1] == 'r') {std::string file_path; s >> junk >> file_path; output.roughness_texture_path = file_path;}
+	  if(line[1] == 'm') {std::string file_path; s >> junk >> file_path; output.metallic_texture_path = file_path;}
 
-	  output.texture_path = file_path;
-
+	  if(line[1] == ' ') {std::string file_path; s >> junk >> file_path; output.texture_path = file_path;}
+	  
 	}
 	
         if (line[0] == 'v') {

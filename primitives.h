@@ -25,6 +25,7 @@
 
 enum e_shading_type {
 
+  SHADING_PBR,
   SHADING_PHONG,
   SHADING_FACE,
   SHADING_FLAT,
@@ -77,7 +78,22 @@ class mesh {
   std::vector<float> mesh_vertices;
   std::vector<float> mesh_tex_coordinates;
   std::vector<float> mesh_normals;
+  std::vector<float> mesh_binormals;
+  std::vector<float> mesh_tangents;
   std::string texture_path;
+
+  std::string albedo_texture_path;
+  std::string normal_texture_path;
+  std::string roughness_texture_path;
+  std::string metallic_texture_path;
+  std::string ambient_occlusion_texture_path;
+
+  GLuint mesh_albedo_texture_id;
+  GLuint mesh_normal_texture_id;
+  GLuint mesh_roughness_texture_id;
+  GLuint mesh_metallic_texture_id;
+  GLuint mesh_ambient_occlusion_texture_id;
+  GLuint mes_tex_id;
   
   e_mesh_types mesh_type = MESH_ENTITY;
   e_shading_type shading_type = SHADING_PHONG; 
@@ -94,7 +110,8 @@ class mesh {
   GLuint mesh_VBO;
   GLuint mesh_tex_VBO;
   GLuint mesh_norm_VBO;
-  GLuint mes_tex_id;
+  GLuint mesh_binorm_VBO;
+  GLuint mesh_tan_VBO;
   GLuint mesh_EBO;
 
   float offset_pos_x = 0.0f;
