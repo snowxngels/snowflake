@@ -238,16 +238,16 @@ int main() {
   // model loading
 
   scene active_scene;
-  
+  /*
   model first_model;
   first_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/teapot/teapot.obj"));
-  first_model.theta_y = 0.0f;
+  first_model.location_x = 10.0f;
   active_scene.add_model_to_scene(first_model);
+  */
   
   model second_model;
   second_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/floor/floor.obj"));
-  second_model.location_y = 1.0f;
-  second_model.location_x = 4.0f;
+  second_model.location_y = -0.2f;
   second_model.physics_type = RIGID_BODY;
   second_model.contained_meshes[0].shading_type = SHADING_PBR;
   active_scene.add_model_to_scene(second_model);
@@ -260,13 +260,13 @@ int main() {
   active_scene.add_model_to_scene(third_model);
   */
 
-  /*
+  /*  
   model skybox_model;
   skybox_model.contained_meshes.push_back(import_obj_mesh_rev2("assets/skybox/skybox.obj"));
   skybox_model.contained_meshes[0].mesh_type = MESH_SKYBOX;
   skybox_model.contained_meshes[0].shading_type = SHADING_NONE;
   active_scene.add_model_to_scene(skybox_model);
-  */
+  */  
   
   light first_light;
   first_light.location_x = 5.0f;
@@ -320,6 +320,7 @@ int main() {
       ////////////////////////////
 
       //calculate mesh vertex normals + track vertex count for lolz
+      
       sub_mesh.mesh_normals = calculate_vert_normals(sub_mesh.mesh_vertices);
       total_vertices = total_vertices + sub_mesh.mesh_vertices.size();
 
@@ -331,6 +332,33 @@ int main() {
       sub_mesh.mesh_binormals = retglob.vert_binormals;
       sub_mesh.mesh_tangents = retglob.vert_tangents;
       
+
+      //////////////////// tmp
+
+      
+      //MeshData meshData;
+
+      //meshData = createMeshData(sub_mesh.mesh_vertices,sub_mesh.mesh_tex_coordinates);
+
+      //      sub_mesh.mesh_binormals = convert_varr_to_farr(meshData.binormals);
+      
+      
+      for(int i = 0; i < 10; i++) {
+	std::cout << sub_mesh.mesh_binormals[i] << " - bin" << std::endl;
+      }
+      
+      //      sub_mesh.mesh_normals = convert_varr_to_farr(meshData.normals);
+
+      for(int i = 0; i < 10; i++) {
+	std::cout << sub_mesh.mesh_normals[i] << " - bin" << std::endl;
+      }
+
+      //      sub_mesh.mesh_tangents = convert_varr_to_farr(meshData.tangents);
+
+      for(int i = 0; i < 10; i++) {
+	std::cout << sub_mesh.mesh_tangents[i] << " - bin" << std::endl;
+      }
+			      
       //////////////////////////
       // BUFFERS
       //////////////////////////
@@ -366,23 +394,24 @@ int main() {
                             (void *)0);
       glEnableVertexAttribArray(2);
 
-      // vbo binormals
-      glGenBuffers(1, &sub_mesh.mesh_binorm_VBO);
-      glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_binorm_VBO);
-      glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_binormals.size() * sizeof(float),
-                   sub_mesh.mesh_binormals.data(), GL_STATIC_DRAW);
-      glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
-                            (void *)0);
-      glEnableVertexAttribArray(3);
-
       // vbo tangents
       glGenBuffers(1, &sub_mesh.mesh_tan_VBO);
       glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_tan_VBO);
       glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_tangents.size() * sizeof(float),
                    sub_mesh.mesh_tangents.data(), GL_STATIC_DRAW);
+      glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
+                            (void *)0);
+      glEnableVertexAttribArray(3);
+      
+      // vbo binormals
+      glGenBuffers(1, &sub_mesh.mesh_binorm_VBO);
+      glBindBuffer(GL_ARRAY_BUFFER, sub_mesh.mesh_binorm_VBO);
+      glBufferData(GL_ARRAY_BUFFER, sub_mesh.mesh_binormals.size() * sizeof(float),
+                   sub_mesh.mesh_binormals.data(), GL_STATIC_DRAW);
       glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
                             (void *)0);
       glEnableVertexAttribArray(4);
+
 
       //      std::cout << sub_mesh.mesh_VBO << " , " << sub_mesh.mesh_tex_VBO << " , " << sub_mesh.mesh_norm_VBO << " - mesh_vbo , tex_vbo and norm_vbo " << std::endl;
 
@@ -395,7 +424,7 @@ int main() {
   //init shader
   phong_shader.use();
 
-  Shader pbr_shader("pbr_vs.glsl", "pbr_fs.glsl");
+  Shader pbr_shader("new_pbr_vs.glsl", "new_pbr_fs.glsl");
   //init shader
   pbr_shader.use();
 
@@ -416,6 +445,8 @@ int main() {
 
         case SHADING_PBR: {
 
+	  pbr_shader.use();
+	  
           std::cout << "loading texture : " << j.albedo_texture_path
                     << "into slot :" << loaded_textures
                     << " with texture_id: " << j.mesh_albedo_texture_id << std::endl;	  
@@ -455,7 +486,8 @@ int main() {
         }
 
         default: {
-
+	  
+	  phong_shader.use();
           j.mes_tex_id = bind_texture_to_slot(j.texture_path, loaded_textures);
           std::cout << "loading texture : " << j.texture_path
                     << "into slot :" << loaded_textures
@@ -506,11 +538,11 @@ int main() {
     // DEMO MOVEMENT CODE
     ///////////////////////////////////
     
-    glm::vec3 light_pos(sin(glfwGetTime())*5.0f, 2.0f, 0.0f);
+    glm::vec3 light_pos(0.0f, 2.0f, 0.0f);
 
     //active_scene.loaded_models[1].location_x = sin(glfwGetTime()) * 7.0f;
     //    active_scene.loaded_models[1].location_y = cos(glfwGetTime()) * 7.0f;
-    //    active_scene.loaded_models[1].theta_x = sin(glfwGetTime()*0.2) * 360;
+    active_scene.loaded_models[0].theta_x = sin(glfwGetTime()*0.2) * 45;
     //active_scene.loaded_models[1].theta_y = cos(glfwGetTime()*0.2) * 360;
     
     // projection matrix
@@ -600,19 +632,19 @@ int main() {
 	  pbr_shader.use();
 
 	  glBindTexture(GL_TEXTURE_2D, j.mesh_albedo_texture_id);
-          pbr_shader.setInt("albedoTexture", 1);
+          pbr_shader.setInt("albedoTexture", 0);
 
 	  glBindTexture(GL_TEXTURE_2D, j.mesh_normal_texture_id);
-          pbr_shader.setInt("normalTexture", 2);
+          pbr_shader.setInt("normalTexture", 1);
 
 	  glBindTexture(GL_TEXTURE_2D, j.mesh_metallic_texture_id);
-          pbr_shader.setInt("metallicTexture", 3);
+          pbr_shader.setInt("metallicTexture", 2);
 
 	  glBindTexture(GL_TEXTURE_2D, j.mesh_roughness_texture_id);
-          pbr_shader.setInt("roughnessTexture", 4);
+          pbr_shader.setInt("roughnessTexture", 3);
 
 	  glBindTexture(GL_TEXTURE_2D, j.mesh_ambient_occlusion_texture_id);
-          pbr_shader.setInt("aoTexture", 5);
+          pbr_shader.setInt("aoTexture", 4);
 
           //write global uniforms
 	  glUniform3f(cameraPosLoc_pbr,cameraPos.x,cameraPos.y,cameraPos.z);

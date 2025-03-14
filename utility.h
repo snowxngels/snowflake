@@ -135,9 +135,9 @@ tan_bin_glob calculate_vert_tan_bin(std::vector<float> mesh_vertices,
     glm::vec3 v2(mesh_vertices[i + 6], mesh_vertices[i + 7],
 		 mesh_vertices[i + 8]); // Vertex 3
 
-    glm::vec2 t0(texture_coordinates[i], texture_coordinates[i + 1]); // Vertex 1
-    glm::vec2 t1(texture_coordinates[i+2], texture_coordinates[i + 3]); // Vertex 2
-    glm::vec2 t2(texture_coordinates[i+4], texture_coordinates[i + 5]); // Vertex 3
+    glm::vec2 t0(texture_coordinates[i], texture_coordinates[i+1]); // Vertex 1
+    glm::vec2 t1(texture_coordinates[i+2], texture_coordinates[i+3]); // Vertex 2
+    glm::vec2 t2(texture_coordinates[i+4], texture_coordinates[i+5]); // Vertex 3
 	    
     glm::vec3 e1(v1-v0);
     glm::vec3 e2(v2-v0);
@@ -153,13 +153,13 @@ tan_bin_glob calculate_vert_tan_bin(std::vector<float> mesh_vertices,
 
     for(int vert_id = 0; vert_id < 3; vert_id++) {
 
-      vert_tangents[i + vert_id] += tangent.x;
-      vert_tangents[i + vert_id + 1] += tangent.y;
-      vert_tangents[i + vert_id + 2] += tangent.z;
+      vert_tangents[i + (vert_id * 3)] += tangent.x;
+      vert_tangents[i + (vert_id * 3) + 1] += tangent.y;
+      vert_tangents[i + (vert_id * 3) + 2] += tangent.z;
 
-      vert_binormals[i + vert_id] += bitangent.x;
-      vert_binormals[i + vert_id + 1] += bitangent.y;
-      vert_binormals[i + vert_id + 2] += bitangent.z;
+      vert_binormals[i + (vert_id * 3)] += bitangent.x;
+      vert_binormals[i + (vert_id * 3) + 1] += bitangent.y;
+      vert_binormals[i + (vert_id * 3) + 2] += bitangent.z;
       
     }
     
@@ -187,19 +187,118 @@ tan_bin_glob calculate_vert_tan_bin(std::vector<float> mesh_vertices,
     
   }
 
-  // optional?
-  /*
-    for (int i = 0; i < numVertices; i++) {
-    // Ensure the tangent is orthogonal to the normal
-    tangent[i] = normalize(tangent[i] - dot(tangent[i], normal[i]) * normal[i]);
-    // Recalculate the bitangent
-    binormal[i] = cross(normal[i], tangent[i]);
-    }
-    
-  */
+  for (size_t i = 0; i < vert_tangents.size(); i += 3) {
+    glm::vec3 normal(mesh_normals[i], mesh_normals[i + 1], mesh_normals[i + 2]);
+    glm::vec3 tangent(vert_tangents[i], vert_tangents[i + 1], vert_tangents[i + 2]);
+
+    // Orthogonalize tangent
+    tangent -= normal * glm::dot(normal, tangent);
+    tangent = glm::normalize(tangent);
+
+    // Recalculate bitangent
+    glm::vec3 bitangent = glm::cross(normal, tangent);
+
+    vert_tangents[i] = tangent.x;
+    vert_tangents[i + 1] = tangent.y;
+    vert_tangents[i + 2] = tangent.z;
+
+    vert_binormals[i] = bitangent.x;
+    vert_binormals[i + 1] = bitangent.y;
+    vert_binormals[i + 2] = bitangent.z;
+}
 
   return_glob.vert_binormals = vert_binormals;
   return_glob.vert_tangents = vert_tangents;
 
   return return_glob;
+}
+
+struct MeshData {
+    std::vector<glm::vec3> vertices;  // Mesh vertices
+    std::vector<glm::vec3> normals;   // Mesh normals
+    std::vector<glm::vec3> tangents;  // Mesh tangents
+    std::vector<glm::vec3> binormals; // Mesh binormals
+};
+
+MeshData createMeshData(const std::vector<float>& mesh_vertices, const std::vector<float>& mesh_texture_coordinates) {
+    MeshData meshData;
+
+    if (mesh_vertices.size() % 9 != 0) {
+        throw std::invalid_argument("mesh_vertices must contain a multiple of 9 floats.");
+    }
+
+    if (mesh_texture_coordinates.size() % 2 != 0 || mesh_texture_coordinates.size() / 2 != mesh_vertices.size() / 3) {
+        throw std::invalid_argument("mesh_texture_coordinates must contain valid UV pairs for each vertex.");
+    }
+
+    size_t numFaces = mesh_vertices.size() / 9;
+
+    for (size_t i = 0; i < numFaces; ++i) {
+        glm::vec3 v1(mesh_vertices[i * 9], mesh_vertices[i * 9 + 1], mesh_vertices[i * 9 + 2]);
+        glm::vec3 v2(mesh_vertices[i * 9 + 3], mesh_vertices[i * 9 + 4], mesh_vertices[i * 9 + 5]);
+        glm::vec3 v3(mesh_vertices[i * 9 + 6], mesh_vertices[i * 9 + 7], mesh_vertices[i * 9 + 8]);
+
+        glm::vec3 edge1 = v2 - v1;
+        glm::vec3 edge2 = v3 - v1;
+        glm::vec3 normal = glm::normalize(glm::cross(edge1, edge2));
+
+        meshData.vertices.push_back(v1);
+        meshData.vertices.push_back(v2);
+        meshData.vertices.push_back(v3);
+        meshData.normals.push_back(normal);
+        meshData.normals.push_back(normal);
+        meshData.normals.push_back(normal);
+
+        glm::vec2 uv1(mesh_texture_coordinates[i * 6], mesh_texture_coordinates[i * 6 + 1]);
+        glm::vec2 uv2(mesh_texture_coordinates[i * 6 + 2], mesh_texture_coordinates[i * 6 + 3]);
+        glm::vec2 uv3(mesh_texture_coordinates[i * 6 + 4], mesh_texture_coordinates[i * 6 + 5]);
+
+        glm::vec3 tangent, binormal;
+        glm::vec3 deltaPos1 = v2 - v1;
+        glm::vec3 deltaPos2 = v3 - v1;
+        glm::vec2 deltaUV1 = uv2 - uv1;
+        glm::vec2 deltaUV2 = uv3 - uv1;
+
+        float r = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
+        tangent.x = r * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
+	tangent.y = r * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
+	tangent.z = r * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
+
+	//        binormal = (deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * r;
+	binormal.x = r* (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
+	binormal.y = r* (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
+	binormal.z = r* (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
+
+	binormal = (deltaPos2 * deltaUV1.x - deltaPos1 * deltaUV2.x) * r;
+
+        tangent = glm::normalize(tangent);
+        binormal = glm::normalize(binormal);
+
+        meshData.tangents.push_back(tangent);
+        meshData.tangents.push_back(tangent);
+        meshData.tangents.push_back(tangent);
+        meshData.binormals.push_back(binormal);
+        meshData.binormals.push_back(binormal);
+        meshData.binormals.push_back(binormal);
+    }
+
+    return meshData;
+}
+
+std::vector<float> convert_varr_to_farr(std::vector<glm::vec3> inarr) {
+
+  std::vector<float> out_arr;
+
+  out_arr.resize((inarr.size()*3)+1);
+  
+  for(int i = 0; i< inarr.size(); i++) {
+
+    out_arr.push_back(inarr[i].x);
+    out_arr.push_back(inarr[i].y);
+    out_arr.push_back(inarr[i].z);
+
+  }
+
+  return out_arr;
+  
 }

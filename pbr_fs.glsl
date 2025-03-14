@@ -4,8 +4,9 @@ out vec4 FragColor;
 
 in vec2 TexCoord; 
 in vec3 FragPos;  
-in vec3 Normal;   
+//in vec3 Normal;   
 in vec3 Tangent;  
+in mat3 TBN;
 
 uniform sampler2D albedoTexture;         
 uniform sampler2D normalTexture;         
@@ -31,9 +32,10 @@ void main()
 
     vec3 viewDir = -normalize(cameraPos - FragPos);
 
-    vec3 lightDir = normalize(light_source - FragPos);
+    vec3 lightDir = -normalize(light_source - FragPos);
     
-    vec3 halfwayDir = normalize(lightDir + viewDir);
+    vec3 halfwayDir = -normalize(lightDir + viewDir);
+//        vec3 halfwayDir = normalize(lightDir + viewDir);
 
     // Diffuse component
     float NdotL = max(dot(normal, lightDir), 0.0);
