@@ -28,8 +28,10 @@ void main()
     vec3 T = normalize(normalMatrix * aTangent);
     vec3 N = normalize(normalMatrix * aNormal);
     T = normalize(T - dot(T, N) * N);
-    vec3 B = cross(N, T);
-    
+
+    //vec3 B = cross(N, T);
+    vec3 B = normalize(aBinormal);
+
     mat3 TBN = transpose(mat3(T, B, N));
     
     TangentLightPos = TBN * light_source;
@@ -37,4 +39,5 @@ void main()
     TangentFragPos  = TBN * FragPos;
         
     gl_Position = projection * view * model * vec4(aPos, 1.0);
+
 }

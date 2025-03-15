@@ -1,12 +1,13 @@
 #pragma once
 
 
-#include "loaders.h"
-#include "shader/shader_class.h"
 #include <glm/ext/quaternion_geometric.hpp>
 #define STB_IMAGE_IMPLEMENTATION
-#include "glad/glad.h"
-#include "libs/image/stb_image.h"
+
+#include "./loaders.h"
+#include "../shader/shader_class.h"
+#include "../glad/glad.h"
+#include "../libs/image/stb_image.h"
 #include "./primitives.h"
 
 #include <GLFW/glfw3.h>

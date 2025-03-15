@@ -1,7 +1,7 @@
 #pragma once
 
-#include "shader/shader_class.h"
-#include "glad/glad.h"
+#include "../shader/shader_class.h"
+#include "../glad/glad.h"
 
 #include <GLFW/glfw3.h>
 #include <glm/ext/vector_float3.hpp>
