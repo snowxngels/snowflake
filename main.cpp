@@ -306,34 +306,6 @@ int main() {
     active_scene.loaded_models.push_back(light_source_visualizer);
 
   }
-
-  ////////////////////////////////////
-  // fbo for depth map
-  ////////////////////////////////////
-  
-  unsigned int depthMapFBO;
-  glGenFramebuffers(1, &depthMapFBO);
-  
-  const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
-  
-  unsigned int depthMap;
-  glGenTextures(1, &depthMap);
-  glBindTexture(GL_TEXTURE_2D, depthMap);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, 
-	       SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); 
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-  //use as depth buffer
-  glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
-  glDrawBuffer(GL_NONE);
-  glReadBuffer(GL_NONE);
-  glBindFramebuffer(GL_FRAMEBUFFER, 0);  
-
-  
   
   ////////////////////////////////////
   // initializing mesh buffers
@@ -422,14 +394,18 @@ int main() {
 
   printf("finished importing %d meshes with %d vertices \n", active_scene.loaded_models.size(), total_vertices);
 
-  Shader phong_shader("phong_vs.glsl", "phong_fs.glsl");
+  Shader phong_shader("shader/shader_src/phong_vs.glsl", "shader/shader_src/phong_fs.glsl");
   //init shader
   phong_shader.use();
 
-  Shader pbr_shader("new_pbr_vs.glsl", "new_pbr_fs.glsl");
+  Shader pbr_shader("shader/shader_src/new_pbr_vs.glsl", "shader/shader_src/new_pbr_fs.glsl");
   //init shader
   pbr_shader.use();
 
+  Shader depth_shader("shader/shader_src/depth_vs.glsl", "shader/shader_src/depth_fs.glsl");
+  //init shader
+  depth_shader.use();
+  
   printf("trying to import a texture...\n");
 
   ////////////////////////////////
@@ -519,6 +495,34 @@ int main() {
 
   int ambient_light_base_loc = glGetUniformLocation(phong_shader.ID, "ambient_light_base");  
   glUniform3f(ambient_light_base_loc,AMBIENT_LIGHTING_BASE,AMBIENT_LIGHTING_BASE,AMBIENT_LIGHTING_BASE);
+
+  //////////////////////////////
+  // depth mapping
+  //////////////////////////////
+
+  const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+
+  unsigned int depthMapFBO;
+  glGenFramebuffers(1, &depthMapFBO);
+  
+  unsigned int depthMap;
+  glGenTextures(1, &depthMap);
+  glBindTexture(GL_TEXTURE_2D, depthMap);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH,
+               SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+  
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+  glDrawBuffer(GL_NONE);
+  glReadBuffer(GL_NONE);
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  
   
   ////////////////////////
   // rendering loop
@@ -581,6 +585,69 @@ int main() {
 
       i.las_phys_calculation = currentFrame;
     }
+
+    ////////////////////////////////////
+    // per mesh depth redering
+    ///////////////////////////////////
+
+    glm::mat4 lightProjection, lightView;
+    glm::mat4 lightSpaceMatrix;
+
+    float near_plane = 1.0f, far_plane = 7.5f;
+
+    lightProjection = glm::ortho(-10.0f,10.0f,-10.0f,10.0f,near_plane,far_plane);
+
+    lightView = glm::lookAt(light_pos, glm::vec3(0.0f), glm::vec3(0.0f,1.0f,0.0f));
+
+    lightSpaceMatrix = lightProjection * lightView;
+
+    depth_shader.use();
+
+    GLuint lightSpaceMatrixUni = glGetUniformLocation(depth_shader.ID, "lightSpaceMatrix");
+    glUniformMatrix4fv(lightSpaceMatrixUni, 1, GL_FALSE,  glm::value_ptr(lightSpaceMatrix));
+
+    glViewport(0,0, SHADOW_WIDTH, SHADOW_HEIGHT);
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glEnable(GL_DEPTH_TEST);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    // render the meshes (depth pass)
+    for(auto i : active_scene.loaded_models) {
+      float parent_mesh_pos_x = i.location_x;
+      float parent_mesh_pos_y = i.location_y;
+      float parent_mesh_pos_z = i.location_z;
+
+      float parent_offset_theta_x = i.theta_x;
+      float parent_offset_theta_y = i.theta_y;
+      float parent_offset_theta_z = i.theta_z;
+      for(auto j : i.contained_meshes) {
+
+	if(j.shading_type != SHADING_PBR) {break;}
+	
+	// model matrix
+        glm::mat4 model = glm::mat4(1.0f);
+	
+	// setting mesh position transform
+	glm::vec3 mod_transform(j.offset_pos_x + parent_mesh_pos_x,
+				j.offset_pos_y + parent_mesh_pos_y,
+				j.offset_pos_z + parent_mesh_pos_z);	
+	model = glm::translate(model, mod_transform);
+	
+	int modelLoc = glGetUniformLocation(phong_shader.ID, "model");
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+	
+	//bind mesh vao
+	glBindVertexArray(j.mesh_VAO);
+	if (glIsVertexArray(j.mesh_VAO) == GL_FALSE) {
+	  std::cout << "ERROR::VAO::INVALID_ID: " << j.mesh_VAO << std::endl;
+	}
+	
+      }
+      
+    }
+
+    glViewport(0,0,window_width,window_heigh);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     ////////////////////////////////////
     // render all meshes

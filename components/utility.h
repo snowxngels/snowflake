@@ -127,7 +127,7 @@ tan_bin_glob calculate_vert_tan_bin(std::vector<float> mesh_vertices,
   vert_tangents.resize(mesh_vertices.size());
   vert_binormals.resize(mesh_vertices.size());
   
-  for (size_t i = 0; i < mesh_vertices.size(); i += 9) {
+  for (size_t i = 0, j = 0; i < mesh_vertices.size(); i += 9, j += 6) {
 
     glm::vec3 v0(mesh_vertices[i], mesh_vertices[i + 1],
 		 mesh_vertices[i + 2]); // Vertex 1
@@ -136,9 +136,9 @@ tan_bin_glob calculate_vert_tan_bin(std::vector<float> mesh_vertices,
     glm::vec3 v2(mesh_vertices[i + 6], mesh_vertices[i + 7],
 		 mesh_vertices[i + 8]); // Vertex 3
 
-    glm::vec2 t0(texture_coordinates[i], texture_coordinates[i+1]); // Vertex 1
-    glm::vec2 t1(texture_coordinates[i+2], texture_coordinates[i+3]); // Vertex 2
-    glm::vec2 t2(texture_coordinates[i+4], texture_coordinates[i+5]); // Vertex 3
+    glm::vec2 t0(texture_coordinates[j], texture_coordinates[j+1]); // Vertex 1
+    glm::vec2 t1(texture_coordinates[j+2], texture_coordinates[j+3]); // Vertex 2
+    glm::vec2 t2(texture_coordinates[j+4], texture_coordinates[j+5]); // Vertex 3
 	    
     glm::vec3 e1(v1-v0);
     glm::vec3 e2(v2-v0);
