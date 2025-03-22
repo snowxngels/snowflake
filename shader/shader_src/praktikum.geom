@@ -69,3 +69,23 @@ for(int i = 0; i < 3; i++) {
 }
     EndPrimitive(); // End the primitive
 }
+
+-==============
+    
+    
+    
+float glob_time = 0.0f; 
+std::chrono::steady_clock::time_point start_time; 
+bool is_first_call = true; 
+
+void updateGlobTime() {
+    if (is_first_call) {
+        start_time = std::chrono::steady_clock::now(); 
+        is_first_call = false; 
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    std::chrono::duration<float> elapsed = now - start_time;
+    glob_time = elapsed.count(); 
+}
+
